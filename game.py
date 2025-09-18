@@ -28,6 +28,7 @@ DARK_GRAY = (64, 64, 64)
 LIGHT_GRAY = (192, 192, 192)
 DARK_BLUE = (0, 0, 139)
 LIGHT_PINK = (255, 182, 193)
+PURPLE = (128, 0, 128)
 
 # Velocidad del jugador
 PLAYER_SPEED = 5
@@ -41,6 +42,7 @@ PIRATE = "pirate"
 NAME_INPUT = "name_input"
 CLASS_SELECTION = "class_selection"
 PLAYING = "playing"
+CINEMATIC = "cinematic"
 
 # Dimensiones de las habitaciones
 ROOM_WIDTH = 800
@@ -213,6 +215,281 @@ class NameInput:
                 self.player_name += event.unicode
         return False
 
+class Enemy:
+    def __init__(self, x, y):
+        """Inicializa el Goblin King"""
+        self.x = x
+        self.y = y
+        self.width = 35  # Más flaco
+        self.height = 80  # Más alto y delgado
+        self.animation_timer = 0
+        self.animation_phase = 0  # 0: entrada, 1: caminar, 2: girar, 3: mirar frente, 4: diálogo
+        self.target_x = 400  # Posición objetivo (mesa)
+        self.target_y = 350
+        self.angle = 0  # Ángulo de rotación
+        self.visible = False
+        self.dialogue_timer = 0
+        self.dialogue_phase = 0  # 0: sin diálogo, 1: "vengo por estos dos", 2: padres gritan, 3: "me los llevaré a jugar", 4: batalla, 5: escape
+        
+    def update(self):
+        """Actualiza la animación del enemigo"""
+        self.animation_timer += 1
+        
+        if self.animation_phase == 0:  # Entrada desde abajo
+            if self.animation_timer < 60:  # 1 segundo
+                self.y = WINDOW_HEIGHT + 50 - (self.animation_timer * 2)
+            else:
+                self.animation_phase = 1
+                self.animation_timer = 0
+                
+        elif self.animation_phase == 1:  # Caminar hacia la mesa
+            if self.animation_timer < 90:  # 1.5 segundos
+                # Movimiento suave hacia la mesa
+                progress = self.animation_timer / 90.0
+                self.x = 400 + (self.target_x - 400) * progress
+                self.y = self.target_y - 20
+            else:
+                self.animation_phase = 2
+                self.animation_timer = 0
+                
+        elif self.animation_phase == 2:  # Girar hacia el frente
+            if self.animation_timer < 30:  # 0.5 segundos
+                self.angle = (self.animation_timer / 30.0) * 90  # Gira 90 grados
+            else:
+                self.animation_phase = 3
+                self.animation_timer = 0
+                self.angle = 90  # Mirando hacia el frente
+                
+        elif self.animation_phase == 3:  # Mirar hacia el frente
+            self.visible = True
+            if self.animation_timer > 30:  # Esperar un poco antes del diálogo
+                self.animation_phase = 4
+                self.animation_timer = 0
+                self.dialogue_phase = 1
+                self.dialogue_timer = 0
+                
+        elif self.animation_phase == 4:  # Fase de diálogo
+            self.dialogue_timer += 1
+            
+            if self.dialogue_phase == 1 and self.dialogue_timer > 120:  # 2 segundos
+                self.dialogue_phase = 2
+                self.dialogue_timer = 0
+            elif self.dialogue_phase == 2 and self.dialogue_timer > 120:  # 2 segundos más
+                self.dialogue_phase = 3
+                self.dialogue_timer = 0
+            elif self.dialogue_phase == 3 and self.dialogue_timer > 180:  # 3 segundos más
+                self.dialogue_phase = 4
+                self.dialogue_timer = 0
+            elif self.dialogue_phase == 4 and self.dialogue_timer > 120:  # Batalla por 2 segundos
+                self.dialogue_phase = 5
+                self.dialogue_timer = 0
+            elif self.dialogue_phase == 5 and self.dialogue_timer > 180:  # Escape por 3 segundos
+                self.animation_phase = 6  # Terminar
+            
+    def draw(self, screen):
+        """Dibuja el Goblin King"""
+        if not self.visible and self.animation_phase < 3:
+            return
+            
+        # Cuerpo delgado (capa larga negra)
+        pygame.draw.rect(screen, BLACK, (self.x + 8, self.y + 35, 20, 45))
+        pygame.draw.rect(screen, DARK_GRAY, (self.x + 8, self.y + 35, 20, 45), 2)
+        
+        # Cabeza más delgada
+        pygame.draw.ellipse(screen, SKIN, (self.x + 10, self.y + 20, 15, 20))
+        
+        # Cabello rubio largo y despeinado
+        pygame.draw.ellipse(screen, YELLOW, (self.x + 8, self.y + 15, 19, 25))
+        pygame.draw.ellipse(screen, YELLOW, (self.x + 5, self.y + 10, 25, 30))
+        pygame.draw.ellipse(screen, YELLOW, (self.x + 3, self.y + 8, 29, 35))
+        pygame.draw.ellipse(screen, YELLOW, (self.x + 1, self.y + 5, 33, 40))
+        
+        # Cabeza encima del cabello
+        pygame.draw.ellipse(screen, SKIN, (self.x + 10, self.y + 20, 15, 20))
+        
+        # Ojos brillantes y misteriosos
+        pygame.draw.circle(screen, RED, (self.x + 15, self.y + 28), 2)
+        pygame.draw.circle(screen, RED, (self.x + 20, self.y + 28), 2)
+        pygame.draw.circle(screen, WHITE, (self.x + 15, self.y + 28), 1)
+        pygame.draw.circle(screen, WHITE, (self.x + 20, self.y + 28), 1)
+        
+        # Nariz puntiaguda
+        pygame.draw.polygon(screen, SKIN, [(self.x + 17, self.y + 32), (self.x + 15, self.y + 35), (self.x + 19, self.y + 35)])
+        
+        # Boca siniestra y puntiaguda
+        pygame.draw.arc(screen, BLACK, (self.x + 14, self.y + 33, 7, 6), 0, math.pi, 2)
+        
+        # Capa larga y dramática
+        pygame.draw.ellipse(screen, DARK_GRAY, (self.x - 5, self.y + 40, 45, 60))
+        pygame.draw.ellipse(screen, BLACK, (self.x - 5, self.y + 40, 45, 60), 2)
+        
+        # Brazos delgados
+        pygame.draw.line(screen, SKIN, (self.x + 6, self.y + 40), (self.x + 2, self.y + 55), 3)
+        pygame.draw.line(screen, SKIN, (self.x + 30, self.y + 40), (self.x + 34, self.y + 55), 3)
+        
+        # Piernas delgadas
+        pygame.draw.line(screen, BLACK, (self.x + 15, self.y + 80), (self.x + 15, self.y + 95), 4)
+        pygame.draw.line(screen, BLACK, (self.x + 20, self.y + 80), (self.x + 20, self.y + 95), 4)
+        
+        # Botas puntiagudas
+        pygame.draw.polygon(screen, BLACK, [(self.x + 12, self.y + 95), (self.x + 18, self.y + 95), (self.x + 20, self.y + 100)])
+        pygame.draw.polygon(screen, BLACK, [(self.x + 17, self.y + 95), (self.x + 23, self.y + 95), (self.x + 25, self.y + 100)])
+        
+        # Dibujar globo de diálogo si está en fase de diálogo
+        if self.animation_phase == 4:
+            self.draw_dialogue(screen)
+    
+    def draw_dialogue(self, screen):
+        """Dibuja los globos de diálogo"""
+        font = pygame.font.Font(None, 24)
+        
+        if self.dialogue_phase == 1:  # Goblin King habla
+            # Globo de diálogo del Goblin King
+            bubble_x = self.x - 50
+            bubble_y = self.y - 40
+            bubble_width = 200
+            bubble_height = 60
+            
+            # Dibujar globo
+            pygame.draw.ellipse(screen, WHITE, (bubble_x, bubble_y, bubble_width, bubble_height))
+            pygame.draw.ellipse(screen, BLACK, (bubble_x, bubble_y, bubble_width, bubble_height), 3)
+            
+            # Cola del globo
+            pygame.draw.polygon(screen, WHITE, [(bubble_x + 20, bubble_y + bubble_height), 
+                                              (bubble_x + 30, bubble_y + bubble_height + 15),
+                                              (bubble_x + 40, bubble_y + bubble_height)])
+            pygame.draw.polygon(screen, BLACK, [(bubble_x + 20, bubble_y + bubble_height), 
+                                              (bubble_x + 30, bubble_y + bubble_height + 15),
+                                              (bubble_x + 40, bubble_y + bubble_height)], 3)
+            
+            # Texto
+            text = font.render("¡Vengo por estos dos!", True, BLACK)
+            text_rect = text.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2))
+            screen.blit(text, text_rect)
+            
+        elif self.dialogue_phase == 2:  # Padres gritan
+            # Globos de diálogo de los padres
+            # Padre (izquierda)
+            father_bubble_x = 200
+            father_bubble_y = 250
+            father_bubble_width = 150
+            father_bubble_height = 50
+            
+            pygame.draw.ellipse(screen, WHITE, (father_bubble_x, father_bubble_y, father_bubble_width, father_bubble_height))
+            pygame.draw.ellipse(screen, BLACK, (father_bubble_x, father_bubble_y, father_bubble_width, father_bubble_height), 3)
+            
+            father_text = font.render("¡David Bowie!", True, BLACK)
+            father_text_rect = father_text.get_rect(center=(father_bubble_x + father_bubble_width//2, father_bubble_y + father_bubble_height//2))
+            screen.blit(father_text, father_text_rect)
+            
+            # Madre (derecha)
+            mother_bubble_x = 450
+            mother_bubble_y = 250
+            mother_bubble_width = 150
+            mother_bubble_height = 50
+            
+            pygame.draw.ellipse(screen, WHITE, (mother_bubble_x, mother_bubble_y, mother_bubble_width, mother_bubble_height))
+            pygame.draw.ellipse(screen, BLACK, (mother_bubble_x, mother_bubble_y, mother_bubble_width, mother_bubble_height), 3)
+            
+            mother_text = font.render("¡David Bowie!", True, BLACK)
+            mother_text_rect = mother_text.get_rect(center=(mother_bubble_x + mother_bubble_width//2, mother_bubble_y + mother_bubble_height//2))
+            screen.blit(mother_text, mother_text_rect)
+            
+        elif self.dialogue_phase == 3:  # Goblin King continúa
+            # Globo de diálogo del Goblin King (más grande)
+            bubble_x = self.x - 80
+            bubble_y = self.y - 60
+            bubble_width = 300
+            bubble_height = 80
+            
+            # Dibujar globo
+            pygame.draw.ellipse(screen, WHITE, (bubble_x, bubble_y, bubble_width, bubble_height))
+            pygame.draw.ellipse(screen, BLACK, (bubble_x, bubble_y, bubble_width, bubble_height), 3)
+            
+            # Cola del globo
+            pygame.draw.polygon(screen, WHITE, [(bubble_x + 30, bubble_y + bubble_height), 
+                                              (bubble_x + 40, bubble_y + bubble_height + 15),
+                                              (bubble_x + 50, bubble_y + bubble_height)])
+            pygame.draw.polygon(screen, BLACK, [(bubble_x + 30, bubble_y + bubble_height), 
+                                              (bubble_x + 40, bubble_y + bubble_height + 15),
+                                              (bubble_x + 50, bubble_y + bubble_height)], 3)
+            
+            # Texto en múltiples líneas
+            text1 = font.render("¡Sí, estoy aburrido y me los llevaré", True, BLACK)
+            text1_rect = text1.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 - 15))
+            screen.blit(text1, text1_rect)
+            
+            text2 = font.render("a jugar juegos de mesa conmigo,", True, BLACK)
+            text2_rect = text2.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 + 5))
+            screen.blit(text2, text2_rect)
+            
+            text3 = font.render("el rey de los goblins!", True, BLACK)
+            text3_rect = text3.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 + 25))
+            screen.blit(text3, text3_rect)
+            
+        elif self.dialogue_phase == 4:  # Batalla
+            # Efectos de batalla
+            self.draw_battle_effects(screen)
+            
+        elif self.dialogue_phase == 5:  # Escape
+            # Efectos de escape
+            self.draw_escape_effects(screen)
+    
+    def draw_battle_effects(self, screen):
+        """Dibuja los efectos de la batalla"""
+        font = pygame.font.Font(None, 24)
+        
+        # Efectos de ataque del personaje
+        if self.dialogue_timer < 60:  # Primer segundo
+            # Efectos de ataque del personaje
+            for i in range(10):
+                x = self.x + (i * 5) + (self.dialogue_timer * 2)
+                y = self.y + 20 + (i * 3)
+                pygame.draw.circle(screen, YELLOW, (x, y), 3)
+                pygame.draw.circle(screen, RED, (x, y), 2)
+        
+        # Texto de batalla
+        battle_text = font.render("¡ATAQUE!", True, RED)
+        battle_rect = battle_text.get_rect(center=(self.x + 50, self.y - 30))
+        screen.blit(battle_text, battle_rect)
+        
+        # Efectos de contraataque del Goblin King
+        if self.dialogue_timer > 30:
+            # Rayos de poder del Goblin King
+            for i in range(8):
+                angle = (i * 45) + (self.dialogue_timer * 5)
+                end_x = self.x + 25 + math.cos(math.radians(angle)) * 50
+                end_y = self.y + 25 + math.sin(math.radians(angle)) * 50
+                pygame.draw.line(screen, PURPLE, (self.x + 25, self.y + 25), (end_x, end_y), 3)
+        
+        # Texto de derrota
+        if self.dialogue_timer > 60:
+            defeat_text = font.render("¡El personaje es derrotado!", True, RED)
+            defeat_rect = defeat_text.get_rect(center=(WINDOW_WIDTH//2, 100))
+            screen.blit(defeat_text, defeat_rect)
+    
+    def draw_escape_effects(self, screen):
+        """Dibuja los efectos del escape"""
+        font = pygame.font.Font(None, 24)
+        
+        # Efectos de escape del Goblin King
+        if self.dialogue_timer < 60:
+            # Movimiento hacia arriba
+            self.y -= 2
+            
+        # Efectos mágicos de escape
+        for i in range(15):
+            angle = (i * 24) + (self.dialogue_timer * 10)
+            radius = 30 + (self.dialogue_timer * 2)
+            x = self.x + 25 + math.cos(math.radians(angle)) * radius
+            y = self.y + 25 + math.sin(math.radians(angle)) * radius
+            pygame.draw.circle(screen, PURPLE, (int(x), int(y)), 2)
+        
+        # Texto de escape
+        escape_text = font.render("¡El Goblin King escapa con los padres!", True, PURPLE)
+        escape_rect = escape_text.get_rect(center=(WINDOW_WIDTH//2, 150))
+        screen.blit(escape_text, escape_rect)
+
 class NPC:
     def __init__(self, x, y, gender="male"):
         """Inicializa un NPC"""
@@ -221,9 +498,16 @@ class NPC:
         self.gender = gender
         self.width = 40
         self.height = 50
+        self.dialogue_timer = 0
+        self.show_dialogue = False
+        self.dialogue_duration = 180  # 3 segundos
+        self.visible = True
         
     def draw(self, screen):
         """Dibuja el NPC"""
+        if not self.visible:
+            return
+            
         if self.gender == "male":
             # Papá
             # Cuerpo (camisa azul)
@@ -258,6 +542,54 @@ class NPC:
             # Piernas
             pygame.draw.line(screen, BLACK, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
             pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
+        
+        # Dibujar globo de diálogo si está activo
+        if self.show_dialogue:
+            self.draw_dialogue(screen)
+    
+    def draw_dialogue(self, screen):
+        """Dibuja el globo de diálogo del NPC"""
+        font = pygame.font.Font(None, 20)
+        
+        # Globo de diálogo
+        bubble_x = self.x - 30
+        bubble_y = self.y - 50
+        bubble_width = 200
+        bubble_height = 40
+        
+        # Dibujar globo
+        pygame.draw.ellipse(screen, WHITE, (bubble_x, bubble_y, bubble_width, bubble_height))
+        pygame.draw.ellipse(screen, BLACK, (bubble_x, bubble_y, bubble_width, bubble_height), 2)
+        
+        # Cola del globo
+        pygame.draw.polygon(screen, WHITE, [(bubble_x + 20, bubble_y + bubble_height), 
+                                          (bubble_x + 30, bubble_y + bubble_height + 10),
+                                          (bubble_x + 40, bubble_y + bubble_height)])
+        pygame.draw.polygon(screen, BLACK, [(bubble_x + 20, bubble_y + bubble_height), 
+                                          (bubble_x + 30, bubble_y + bubble_height + 10),
+                                          (bubble_x + 40, bubble_y + bubble_height)], 2)
+        
+        # Texto
+        text = font.render("Ya vete a dormir, nosotros", True, BLACK)
+        text_rect = text.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 - 8))
+        screen.blit(text, text_rect)
+        
+        text2 = font.render("vamos a quedarnos jugando", True, BLACK)
+        text2_rect = text2.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 + 8))
+        screen.blit(text2, text2_rect)
+    
+    def start_dialogue(self):
+        """Inicia el diálogo del NPC"""
+        self.show_dialogue = True
+        self.dialogue_timer = 0
+    
+    def update_dialogue(self):
+        """Actualiza el temporizador del diálogo"""
+        if self.show_dialogue:
+            self.dialogue_timer += 1
+            if self.dialogue_timer >= self.dialogue_duration:
+                self.show_dialogue = False
+                self.dialogue_timer = 0
 
 class Environment:
     def __init__(self):
@@ -273,7 +605,11 @@ class Environment:
         self.obstacles.append(pygame.Rect(0, 0, WINDOW_WIDTH, 20))  # Pared superior
         self.obstacles.append(pygame.Rect(0, 0, 20, WINDOW_HEIGHT))  # Pared izquierda
         self.obstacles.append(pygame.Rect(WINDOW_WIDTH-20, 0, 20, WINDOW_HEIGHT))  # Pared derecha
-        self.obstacles.append(pygame.Rect(0, WINDOW_HEIGHT-20, WINDOW_WIDTH, 20))  # Pared inferior
+        
+        # Pared inferior con entrada en el centro
+        self.obstacles.append(pygame.Rect(0, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior izquierda
+        self.obstacles.append(pygame.Rect(450, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior derecha
+        # El espacio entre 350 y 450 es la entrada (100 píxeles de ancho)
         
         # Paredes internas
         self.obstacles.append(pygame.Rect(200, 0, 20, 300))  # Pared entre sala y cocina
@@ -317,7 +653,13 @@ class Environment:
         pygame.draw.rect(screen, LIGHT_GRAY, (0, 0, WINDOW_WIDTH, 20))  # Pared superior
         pygame.draw.rect(screen, LIGHT_GRAY, (0, 0, 20, WINDOW_HEIGHT))  # Pared izquierda
         pygame.draw.rect(screen, LIGHT_GRAY, (WINDOW_WIDTH-20, 0, 20, WINDOW_HEIGHT))  # Pared derecha
-        pygame.draw.rect(screen, LIGHT_GRAY, (0, WINDOW_HEIGHT-20, WINDOW_WIDTH, 20))  # Pared inferior
+        
+        # Pared inferior con entrada
+        pygame.draw.rect(screen, LIGHT_GRAY, (0, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior izquierda
+        pygame.draw.rect(screen, LIGHT_GRAY, (450, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior derecha
+        
+        # Dibujar la entrada/puerta
+        self.draw_entrance(screen)
         
         # Paredes internas
         pygame.draw.rect(screen, LIGHT_GRAY, (200, 0, 20, 300))  # Pared a cocina
@@ -480,6 +822,38 @@ class Environment:
         # Patas
         pygame.draw.rect(screen, DARK_BROWN, (x + 2, y + 40, 3, 20))
         pygame.draw.rect(screen, DARK_BROWN, (x + 15, y + 40, 3, 20))
+    
+    def draw_entrance(self, screen):
+        """Dibuja la entrada/puerta en la pared inferior"""
+        entrance_x = 350
+        entrance_y = WINDOW_HEIGHT - 20
+        entrance_width = 100
+        entrance_height = 20
+        
+        # Marco de la puerta
+        pygame.draw.rect(screen, DARK_BROWN, (entrance_x, entrance_y, entrance_width, entrance_height))
+        pygame.draw.rect(screen, BROWN, (entrance_x, entrance_y, entrance_width, entrance_height), 2)
+        
+        # Puerta principal
+        door_x = entrance_x + 5
+        door_y = entrance_y + 2
+        door_width = entrance_width - 10
+        door_height = entrance_height - 4
+        
+        pygame.draw.rect(screen, DARK_BROWN, (door_x, door_y, door_width, door_height))
+        pygame.draw.rect(screen, BLACK, (door_x, door_y, door_width, door_height), 2)
+        
+        # Manija de la puerta
+        handle_x = door_x + door_width - 15
+        handle_y = door_y + door_height // 2 - 3
+        pygame.draw.circle(screen, YELLOW, (handle_x, handle_y), 4)
+        pygame.draw.circle(screen, BLACK, (handle_x, handle_y), 4, 2)
+        
+        # Texto indicativo
+        font = pygame.font.Font(None, 16)
+        text = font.render("SALIDA", True, WHITE)
+        text_rect = text.get_rect(center=(entrance_x + entrance_width//2, entrance_y - 10))
+        screen.blit(text, text_rect)
 
 class Player:
     def __init__(self, x, y, name="", character_class=KARATEKA):
@@ -652,7 +1026,7 @@ class Player:
         pygame.draw.ellipse(screen, BLACK, (self.x + 8, self.y + 5, 24, 12))
         pygame.draw.ellipse(screen, WHITE, (self.x + 8, self.y + 5, 24, 12), 2)
 
-class Game:
+class Game: 
     def __init__(self):
         """Inicializa el juego"""
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -672,6 +1046,18 @@ class Game:
         self.environment = None
         self.father = None
         self.mother = None
+        self.enemy = None
+        
+        # Variables de cinemática
+        self.flash_timer = 0
+        self.flash_duration = 30  # 0.5 segundos
+        self.cinematic_triggered = False
+        self.final_flash = False
+        self.final_flash_timer = 0
+        
+        # Variables de acción
+        self.action_pressed = False
+        self.action_cooldown = 0
         
     def handle_events(self):
         """Maneja los eventos del juego"""
@@ -681,6 +1067,11 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
+                elif event.key == pygame.K_RETURN and self.game_state == PLAYING:
+                    # Botón de acción con ENTER
+                    if self.action_cooldown == 0:
+                        self.action_pressed = True
+                        self.action_cooldown = 30  # 0.5 segundos de cooldown
                 elif self.game_state == NAME_INPUT:
                     if self.name_input.handle_input(event):
                         self.game_state = CLASS_SELECTION
@@ -704,6 +1095,9 @@ class Game:
         self.father = NPC(280, 320, "male")  # Papá en la silla izquierda
         self.mother = NPC(500, 320, "female")  # Mamá en la silla derecha
         
+        # Crear el enemigo (inicialmente invisible)
+        self.enemy = Enemy(400, WINDOW_HEIGHT + 50)
+        
         # Cambiar al estado de juego
         self.game_state = PLAYING
                     
@@ -720,6 +1114,105 @@ class Game:
             
             # Actualizar el jugador con detección de colisiones
             self.player.handle_input(keys, all_obstacles)
+            
+            # Verificar colisión con NPCs para mostrar diálogos
+            self.check_npc_collisions()
+            
+            # Actualizar diálogos de NPCs
+            self.father.update_dialogue()
+            self.mother.update_dialogue()
+            
+            # Actualizar cooldown del botón de acción
+            if self.action_cooldown > 0:
+                self.action_cooldown -= 1
+            
+            # Actualizar flash final
+            if self.final_flash:
+                self.final_flash_timer += 1
+                if self.final_flash_timer > 60:  # 1 segundo
+                    self.final_flash = False
+            
+            # Procesar acción si se presionó ENTER
+            if self.action_pressed:
+                self.process_action()
+                self.action_pressed = False
+            
+            # Verificar si el jugador llegó a la zona de entrada para activar cinemática
+            entrance_x = 350
+            entrance_width = 100
+            if (not self.cinematic_triggered and 
+                self.player.y >= WINDOW_HEIGHT - self.player.height - 10 and
+                entrance_x <= self.player.x + self.player.width//2 <= entrance_x + entrance_width):
+                self.trigger_cinematic()
+                
+        elif self.game_state == CINEMATIC:
+            # Actualizar la cinemática
+            self.update_cinematic()
+    
+    def trigger_cinematic(self):
+        """Activa la cinemática del enemigo"""
+        self.cinematic_triggered = True
+        self.game_state = CINEMATIC
+        self.flash_timer = 0
+        self.enemy.visible = True
+        self.enemy.animation_phase = 0
+        self.enemy.animation_timer = 0
+        
+    def update_cinematic(self):
+        """Actualiza la animación de la cinemática"""
+        # Actualizar el enemigo
+        self.enemy.update()
+        
+        # Actualizar el flash
+        if self.flash_timer < self.flash_duration:
+            self.flash_timer += 1
+        
+        # Si la animación del enemigo terminó, volver al juego
+        if self.enemy.animation_phase == 6:  # Fase final
+            self.game_state = PLAYING
+            # Los padres desaparecen (son llevados por el Goblin King)
+            self.father.visible = False
+            self.mother.visible = False
+            # Activar flash final
+            self.final_flash = True
+            self.final_flash_timer = 0
+    
+    def check_npc_collisions(self):
+        """Verifica colisiones con NPCs para mostrar diálogos"""
+        player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+        
+        # Verificar colisión con el padre
+        father_rect = pygame.Rect(self.father.x, self.father.y, self.father.width, self.father.height)
+        if player_rect.colliderect(father_rect) and not self.father.show_dialogue:
+            self.father.start_dialogue()
+        
+        # Verificar colisión con la madre
+        mother_rect = pygame.Rect(self.mother.x, self.mother.y, self.mother.width, self.mother.height)
+        if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
+            self.mother.start_dialogue()
+    
+    def process_action(self):
+        """Procesa la acción del botón ENTER"""
+        # Verificar si está cerca de algún NPC para forzar diálogo
+        player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+        
+        # Verificar proximidad con el padre
+        father_rect = pygame.Rect(self.father.x - 20, self.father.y - 20, self.father.width + 40, self.father.height + 40)
+        if player_rect.colliderect(father_rect) and not self.father.show_dialogue:
+            self.father.start_dialogue()
+        
+        # Verificar proximidad con la madre
+        mother_rect = pygame.Rect(self.mother.x - 20, self.mother.y - 20, self.mother.width + 40, self.mother.height + 40)
+        if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
+            self.mother.start_dialogue()
+        
+        # Verificar si está en la zona de la puerta para activar cinemática
+        entrance_x = 350
+        entrance_width = 100
+        if (not self.cinematic_triggered and 
+            self.player.y >= WINDOW_HEIGHT - self.player.height - 20 and
+            entrance_x <= self.player.x + self.player.width//2 <= entrance_x + entrance_width):
+            self.trigger_cinematic()
         
     def draw(self):
         """Dibuja todos los elementos en pantalla"""
@@ -737,6 +1230,36 @@ class Game:
             
             # Dibujar el jugador encima de todo
             self.player.draw(self.screen)
+            
+            # Mostrar información del jugador
+            self.draw_player_info()
+            
+            # Mostrar indicador de acción
+            self.draw_action_indicator()
+            
+            # Mostrar flash final si está activo
+            if self.final_flash:
+                self.draw_final_flash()
+            
+            # Actualiza la pantalla
+            pygame.display.flip()
+            
+        elif self.game_state == CINEMATIC:
+            # Dibujar el ambiente primero (fondo)
+            self.environment.draw(self.screen)
+            
+            # Dibujar los NPCs
+            self.father.draw(self.screen)
+            self.mother.draw(self.screen)
+            
+            # Dibujar el jugador
+            self.player.draw(self.screen)
+            
+            # Dibujar el enemigo
+            self.enemy.draw(self.screen)
+            
+            # Efecto de flash
+            self.draw_flash_effect()
             
             # Mostrar información del jugador
             self.draw_player_info()
@@ -764,6 +1287,86 @@ class Game:
         if self.player.character_class == MAGE:
             mana_text = font.render(f"Maná: {self.player.mana}/{self.player.max_mana}", True, BLUE)
             self.screen.blit(mana_text, (10, 85))
+    
+    def draw_flash_effect(self):
+        """Dibuja el efecto de flash en pantalla completa"""
+        if self.flash_timer < self.flash_duration:
+            # Calcular la intensidad del flash (máximo al inicio, decrece con el tiempo)
+            intensity = 255 - (self.flash_timer * 255 // self.flash_duration)
+            
+            # Crear una superficie semi-transparente blanca
+            flash_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+            flash_surface.set_alpha(intensity)
+            flash_surface.fill(WHITE)
+            
+            # Dibujar el flash sobre toda la pantalla
+            self.screen.blit(flash_surface, (0, 0))
+    
+    def draw_action_indicator(self):
+        """Dibuja el indicador del botón de acción"""
+        font = pygame.font.Font(None, 20)
+        
+        # Verificar si está cerca de algún NPC o la puerta
+        player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+        
+        # Verificar proximidad con NPCs
+        father_rect = pygame.Rect(self.father.x - 20, self.father.y - 20, self.father.width + 40, self.father.height + 40)
+        mother_rect = pygame.Rect(self.mother.x - 20, self.mother.y - 20, self.mother.width + 40, self.mother.height + 40)
+        
+        # Verificar proximidad con la puerta
+        entrance_x = 350
+        entrance_width = 100
+        entrance_rect = pygame.Rect(entrance_x, WINDOW_HEIGHT - 40, entrance_width, 40)
+        
+        show_indicator = False
+        action_text = ""
+        
+        if player_rect.colliderect(father_rect) or player_rect.colliderect(mother_rect):
+            show_indicator = True
+            action_text = "ENTER - Hablar"
+        elif player_rect.colliderect(entrance_rect) and not self.cinematic_triggered:
+            show_indicator = True
+            action_text = "ENTER - Salir"
+        
+        if show_indicator:
+            # Dibujar fondo del indicador
+            text_surface = font.render(action_text, True, WHITE)
+            text_rect = text_surface.get_rect()
+            
+            # Fondo del texto
+            bg_rect = pygame.Rect(self.player.x - 10, self.player.y - 30, text_rect.width + 20, text_rect.height + 10)
+            pygame.draw.rect(self.screen, BLACK, bg_rect)
+            pygame.draw.rect(self.screen, WHITE, bg_rect, 2)
+            
+            # Texto
+            text_rect.center = bg_rect.center
+            self.screen.blit(text_surface, text_rect)
+            
+            # Indicador visual de cooldown
+            if self.action_cooldown > 0:
+                cooldown_text = font.render(f"({self.action_cooldown//10 + 1})", True, YELLOW)
+                cooldown_rect = cooldown_text.get_rect()
+                cooldown_rect.center = (bg_rect.centerx, bg_rect.centery + 20)
+                self.screen.blit(cooldown_text, cooldown_rect)
+    
+    def draw_final_flash(self):
+        """Dibuja el flash final cuando el Goblin King se lleva a los padres"""
+        # Calcular la intensidad del flash (máximo al inicio, decrece con el tiempo)
+        intensity = 255 - (self.final_flash_timer * 255 // 60)
+        
+        # Crear una superficie semi-transparente púrpura
+        flash_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        flash_surface.set_alpha(intensity)
+        flash_surface.fill(PURPLE)
+        
+        # Dibujar el flash sobre toda la pantalla
+        self.screen.blit(flash_surface, (0, 0))
+        
+        # Texto dramático
+        font = pygame.font.Font(None, 36)
+        text = font.render("¡Los padres han sido secuestrados!", True, WHITE)
+        text_rect = text.get_rect(center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+        self.screen.blit(text, text_rect)
         
     def run(self):
         """Bucle principal del juego"""
@@ -791,3 +1394,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
