@@ -8,6 +8,7 @@ SPRITE_WIDTH = 32  # Ancho de cada sprite individual
 SPRITE_HEIGHT = 32  # Alto de cada sprite individual
 
 # Definir las posiciones de los sprites en el sprite sheet (fila, columna)
+# Basado en la descripción: 8 filas x 10 columnas, cada sprite 32x32
 # Fila 8 (última fila): Niña (esquina inferior derecha) - columna 10
 GIRL_SPRITE_ROW = 7  # Fila 8 (índice 7)
 GIRL_SPRITE_COL = 9   # Columna 10 (índice 9)
@@ -35,6 +36,15 @@ class SpriteManager:
         sprite_col = col * 4 + direction
         x = sprite_col * SPRITE_WIDTH
         y = row * SPRITE_HEIGHT
+        
+        # Verificar que las coordenadas estén dentro del sprite sheet
+        sheet_width = self.sprite_sheet.get_width()
+        sheet_height = self.sprite_sheet.get_height()
+        
+        if x + SPRITE_WIDTH > sheet_width or y + SPRITE_HEIGHT > sheet_height:
+            # Usar el primer sprite como fallback
+            return self.sprite_sheet.subsurface((0, 0, SPRITE_WIDTH, SPRITE_HEIGHT))
+        
         return self.sprite_sheet.subsurface((x, y, SPRITE_WIDTH, SPRITE_HEIGHT))
     
     def get_girl_sprite(self, direction=0):
@@ -82,6 +92,10 @@ PURPLE = (128, 0, 128)
 
 # Velocidad del jugador
 PLAYER_SPEED = 5
+
+# Cargar y escalar el background de la casa
+HOUSE_BACKGROUND = pygame.image.load("interior_casa.png")
+HOUSE_BACKGROUND = pygame.transform.scale(HOUSE_BACKGROUND, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
 # Clases de personaje
 KARATEKA = "karateka"
@@ -286,26 +300,21 @@ class Enemy:
         """Actualiza la animación del enemigo"""
         self.animation_timer += 1
         
-        if self.animation_phase == 0:  # Entrada desde abajo
+        if self.animation_phase == 0:  # Entrada desde el sótano
             if self.animation_timer < 60:  # 1 segundo
-                self.y = WINDOW_HEIGHT + 50 - (self.animation_timer * 2)
+                self.y = 400 - (self.animation_timer * 2)  # Aparece desde abajo (sótano)
             else:
                 self.animation_phase = 1
                 self.animation_timer = 0
                 
-        elif self.animation_phase == 1:  # Caminar hacia la mesa
+        elif self.animation_phase == 1:  # Caminar hacia la mesa donde están los padres
             if self.animation_timer < 90:  # 1.5 segundos
-                # Movimiento suave hacia la mesa
+                # Movimiento suave hacia la mesa en la sala de estar
                 progress = self.animation_timer / 90.0
-                self.x = 400 + (self.target_x - 400) * progress
-                self.y = self.target_y - 20
+                self.x = 100 + (490 - 100) * progress  # Se mueve hacia la mesa
+                self.y = 400 - (200 - 400) * progress  # Se mueve hacia arriba
                 # Determinar dirección basada en el movimiento
-                if self.target_x > 400:
-                    self.direction = 2  # right
-                elif self.target_x < 400:
-                    self.direction = 1  # left
-                else:
-                    self.direction = 0  # down
+                self.direction = 2  # right (se mueve hacia la derecha)
             else:
                 self.animation_phase = 2
                 self.animation_timer = 0
@@ -597,59 +606,57 @@ class Environment:
     def __init__(self):
         """Inicializa el ambiente de la casa"""
         self.obstacles = []
+        self.background = HOUSE_BACKGROUND
         self.setup_obstacles()
         
     def setup_obstacles(self):
-        """Configura todos los obstáculos de la casa"""
+        """Configura todos los obstáculos de la casa basados en la nueva imagen"""
         self.obstacles = []
         
-        # Paredes exteriores
-        self.obstacles.append(pygame.Rect(0, 0, WINDOW_WIDTH, 20))  # Pared superior
-        self.obstacles.append(pygame.Rect(0, 0, 20, WINDOW_HEIGHT))  # Pared izquierda
-        self.obstacles.append(pygame.Rect(WINDOW_WIDTH-20, 0, 20, WINDOW_HEIGHT))  # Pared derecha
-        
-        # Pared inferior con entrada en el centro
-        self.obstacles.append(pygame.Rect(0, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior izquierda
-        self.obstacles.append(pygame.Rect(450, WINDOW_HEIGHT-20, 350, 20))  # Pared inferior derecha
-        # El espacio entre 350 y 450 es la entrada (100 píxeles de ancho)
+        # Paredes exteriores (ajustadas para la nueva imagen)
+        self.obstacles.append(pygame.Rect(0, 0, WINDOW_WIDTH, 25))  # Pared superior
+        self.obstacles.append(pygame.Rect(0, 0, 25, WINDOW_HEIGHT))  # Pared izquierda
+        self.obstacles.append(pygame.Rect(WINDOW_WIDTH-25, 0, 25, WINDOW_HEIGHT))  # Pared derecha
+        self.obstacles.append(pygame.Rect(0, WINDOW_HEIGHT-25, WINDOW_WIDTH, 25))  # Pared inferior
         
         # Paredes internas
-        self.obstacles.append(pygame.Rect(200, 0, 20, 300))  # Pared entre sala y cocina
-        self.obstacles.append(pygame.Rect(580, 0, 20, 300))  # Pared entre sala y lobby
-        self.obstacles.append(pygame.Rect(200, 280, 400, 20))  # Pared horizontal entre habitaciones
+        # Pared entre dormitorio y sala de estar
+        self.obstacles.append(pygame.Rect(200, 0, 20, 250))  # Pared vertical izquierda
+        # Pared entre sala de estar y cocina
+        self.obstacles.append(pygame.Rect(450, 0, 20, 300))  # Pared vertical derecha
+        # Pared horizontal entre habitaciones superiores e inferiores
+        self.obstacles.append(pygame.Rect(200, 250, 250, 20))  # Pared horizontal
         
-        # Libreros
-        self.obstacles.append(pygame.Rect(50, 100, 120, 200))  # Librero izquierdo
-        self.obstacles.append(pygame.Rect(630, 100, 120, 200))  # Librero derecho
+        # Muebles del dormitorio (superior izquierdo)
+        self.obstacles.append(pygame.Rect(30, 50, 80, 120))  # Cama
+        self.obstacles.append(pygame.Rect(120, 80, 60, 40))  # Estante con tetera
         
-        # Mesa del comedor
-        self.obstacles.append(pygame.Rect(300, 300, 200, 100))
+        # Muebles de la sala de estar (superior derecho)
+        self.obstacles.append(pygame.Rect(480, 80, 80, 60))  # Chimenea
+        self.obstacles.append(pygame.Rect(470, 160, 100, 60))  # Mesa con sillas
+        self.obstacles.append(pygame.Rect(500, 40, 40, 30))  # Estante con plantas
         
-        # Sillas del comedor
-        self.obstacles.append(pygame.Rect(280, 320, 20, 30))  # Silla izquierda
-        self.obstacles.append(pygame.Rect(500, 320, 20, 30))  # Silla derecha
+        # Muebles del área central
+        self.obstacles.append(pygame.Rect(220, 280, 40, 60))  # Perchero con canasta
         
-        # Muebles de cocina
-        self.obstacles.append(pygame.Rect(20, 320, 60, 40))  # Refrigerador
-        self.obstacles.append(pygame.Rect(100, 320, 80, 40))  # Estufa
-        self.obstacles.append(pygame.Rect(20, 380, 160, 40))  # Mesada
+        # Muebles del área de almacenamiento (inferior izquierdo)
+        self.obstacles.append(pygame.Rect(30, 300, 120, 80))  # Estantes con jarras
+        self.obstacles.append(pygame.Rect(80, 380, 40, 20))  # Escaleras al sótano
         
-        # Muebles del lobby
-        self.obstacles.append(pygame.Rect(600, 320, 60, 40))  # Mesa de entrada
-        self.obstacles.append(pygame.Rect(600, 380, 60, 40))  # Banco
-        self.obstacles.append(pygame.Rect(680, 320, 100, 100))  # Sofá
+        # Muebles de la cocina (inferior derecho)
+        self.obstacles.append(pygame.Rect(480, 320, 100, 40))  # Mostrador con fregadero
+        self.obstacles.append(pygame.Rect(600, 320, 60, 40))  # Estufa
+        self.obstacles.append(pygame.Rect(580, 360, 80, 60))  # Mesa de comedor
+        self.obstacles.append(pygame.Rect(480, 380, 30, 40))  # Cubo blanco
         
     def draw(self, screen):
         """Dibuja el ambiente completo de la casa"""
-        # Piso principal
-        pygame.draw.rect(screen, CREAM, (0, 0, WINDOW_WIDTH, WINDOW_HEIGHT))
+        # Dibujar el background de la casa
+        screen.blit(self.background, (0, 0))
         
-        # Dibujar todas las habitaciones
-        self.draw_main_room(screen)
-        self.draw_kitchen(screen)
-        self.draw_lobby(screen)
-        
-    def draw_main_room(self, screen):
+    # Métodos de dibujo antiguos eliminados - ahora usamos background de imagen
+    
+    def draw_entrance(self, screen):
         """Dibuja la sala principal"""
         # Paredes
         pygame.draw.rect(screen, LIGHT_GRAY, (0, 0, WINDOW_WIDTH, 20))  # Pared superior
@@ -826,34 +833,20 @@ class Environment:
         pygame.draw.rect(screen, DARK_BROWN, (x + 15, y + 40, 3, 20))
     
     def draw_entrance(self, screen):
-        """Dibuja la entrada/puerta en la pared inferior"""
-        entrance_x = 350
-        entrance_y = WINDOW_HEIGHT - 20
-        entrance_width = 100
+        """Dibuja la entrada al sótano donde aparece el Goblin King"""
+        # Posición de la entrada al sótano (según la nueva imagen)
+        entrance_x = 80
+        entrance_y = 380
+        entrance_width = 40
         entrance_height = 20
         
-        # Marco de la puerta
-        pygame.draw.rect(screen, DARK_BROWN, (entrance_x, entrance_y, entrance_width, entrance_height))
-        pygame.draw.rect(screen, BROWN, (entrance_x, entrance_y, entrance_width, entrance_height), 2)
-        
-        # Puerta principal
-        door_x = entrance_x + 5
-        door_y = entrance_y + 2
-        door_width = entrance_width - 10
-        door_height = entrance_height - 4
-        
-        pygame.draw.rect(screen, DARK_BROWN, (door_x, door_y, door_width, door_height))
-        pygame.draw.rect(screen, BLACK, (door_x, door_y, door_width, door_height), 2)
-        
-        # Manija de la puerta
-        handle_x = door_x + door_width - 15
-        handle_y = door_y + door_height // 2 - 3
-        pygame.draw.circle(screen, YELLOW, (handle_x, handle_y), 4)
-        pygame.draw.circle(screen, BLACK, (handle_x, handle_y), 4, 2)
+        # Dibujar indicador visual de la entrada
+        pygame.draw.rect(screen, (100, 100, 100), (entrance_x, entrance_y, entrance_width, entrance_height))
+        pygame.draw.rect(screen, BLACK, (entrance_x, entrance_y, entrance_width, entrance_height), 2)
         
         # Texto indicativo
         font = pygame.font.Font(None, 16)
-        text = font.render("SALIDA", True, WHITE)
+        text = font.render("ENTRADA", True, WHITE)
         text_rect = text.get_rect(center=(entrance_x + entrance_width//2, entrance_y - 10))
         screen.blit(text, text_rect)
 
@@ -1002,11 +995,11 @@ class Game:
         self.environment = Environment()
         
         # Crear los NPCs (padres en el comedor)
-        self.father = NPC(280, 320, "male")  # Papá en la silla izquierda
-        self.mother = NPC(500, 320, "female")  # Mamá en la silla derecha
+        self.father = NPC(470, 180, "male")  # Papá junto a la mesa en la sala de estar
+        self.mother = NPC(520, 180, "female")  # Mamá junto a la mesa en la sala de estar
         
-        # Crear el enemigo (inicialmente invisible)
-        self.enemy = Enemy(400, WINDOW_HEIGHT + 50)
+        # Crear el enemigo (inicialmente invisible) - aparece desde la entrada al sótano
+        self.enemy = Enemy(100, 400)
         
         # Cambiar al estado de juego
         self.game_state = PLAYING
@@ -1116,12 +1109,15 @@ class Game:
         if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
             self.mother.start_dialogue()
         
-        # Verificar si está en la zona de la puerta para activar cinemática
-        entrance_x = 350
-        entrance_width = 100
+        # Verificar si está en la zona de la entrada al sótano para activar cinemática
+        entrance_x = 80
+        entrance_width = 40
+        entrance_y = 380
         if (not self.cinematic_triggered and 
-            self.player.y >= WINDOW_HEIGHT - self.player.height - 20 and
-            entrance_x <= self.player.x + self.player.width//2 <= entrance_x + entrance_width):
+            self.player.x >= entrance_x and 
+            self.player.x <= entrance_x + entrance_width and
+            self.player.y >= entrance_y - 20 and
+            self.player.y <= entrance_y + 20):
             self.trigger_cinematic()
         
     def draw(self):
