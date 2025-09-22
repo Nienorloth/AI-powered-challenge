@@ -2,6 +2,56 @@ import pygame
 import sys
 import math
 
+# Cargar el sprite sheet
+SPRITE_SHEET = pygame.image.load("sprites.png")
+SPRITE_WIDTH = 32  # Ancho de cada sprite individual
+SPRITE_HEIGHT = 32  # Alto de cada sprite individual
+
+# Definir las posiciones de los sprites en el sprite sheet (fila, columna)
+# Fila 8 (última fila): Niña (esquina inferior derecha) - columna 10
+GIRL_SPRITE_ROW = 7  # Fila 8 (índice 7)
+GIRL_SPRITE_COL = 9   # Columna 10 (índice 9)
+
+# Fila 7: Mamá (cabello rojo) - arriba de la niña
+MOM_SPRITE_ROW = 6    # Fila 7 (índice 6) 
+MOM_SPRITE_COL = 9    # Columna 10 (índice 9)
+
+# Fila 8: Papá (capucha negra) - esquina inferior izquierda
+DAD_SPRITE_ROW = 7    # Fila 8 (índice 7)
+DAD_SPRITE_COL = 0    # Columna 1 (índice 0)
+
+# Fila 8: Goblin King (cabello rubio) - izquierda de la niña
+GOBLIN_SPRITE_ROW = 7 # Fila 8 (índice 7)
+GOBLIN_SPRITE_COL = 8  # Columna 9 (índice 8)
+
+# Direcciones de los sprites (0=down, 1=left, 2=right, 3=up)
+class SpriteManager:
+    def __init__(self):
+        self.sprite_sheet = SPRITE_SHEET
+        
+    def get_sprite(self, row, col, direction=0):
+        """Obtiene un sprite específico del sprite sheet"""
+        # Cada sprite tiene 4 direcciones: down (0), left (1), right (2), up (3)
+        sprite_col = col * 4 + direction
+        x = sprite_col * SPRITE_WIDTH
+        y = row * SPRITE_HEIGHT
+        return self.sprite_sheet.subsurface((x, y, SPRITE_WIDTH, SPRITE_HEIGHT))
+    
+    def get_girl_sprite(self, direction=0):
+        return self.get_sprite(GIRL_SPRITE_ROW, GIRL_SPRITE_COL, direction)
+    
+    def get_mom_sprite(self, direction=0):
+        return self.get_sprite(MOM_SPRITE_ROW, MOM_SPRITE_COL, direction)
+    
+    def get_dad_sprite(self, direction=0):
+        return self.get_sprite(DAD_SPRITE_ROW, DAD_SPRITE_COL, direction)
+    
+    def get_goblin_sprite(self, direction=0):
+        return self.get_sprite(GOBLIN_SPRITE_ROW, GOBLIN_SPRITE_COL, direction)
+
+# Instancia global del sprite manager
+sprite_manager = SpriteManager()
+
 # Inicialización de Pygame
 pygame.init()
 
@@ -220,8 +270,8 @@ class Enemy:
         """Inicializa el Goblin King"""
         self.x = x
         self.y = y
-        self.width = 35  # Más flaco
-        self.height = 80  # Más alto y delgado
+        self.width = 40  # Ajustar al tamaño estándar
+        self.height = 50  # Ajustar al tamaño estándar
         self.animation_timer = 0
         self.animation_phase = 0  # 0: entrada, 1: caminar, 2: girar, 3: mirar frente, 4: diálogo
         self.target_x = 400  # Posición objetivo (mesa)
@@ -230,6 +280,7 @@ class Enemy:
         self.visible = False
         self.dialogue_timer = 0
         self.dialogue_phase = 0  # 0: sin diálogo, 1: "vengo por estos dos", 2: padres gritan, 3: "me los llevaré a jugar", 4: batalla, 5: escape
+        self.direction = 0  # 0=down, 1=left, 2=right, 3=up
         
     def update(self):
         """Actualiza la animación del enemigo"""
@@ -248,6 +299,13 @@ class Enemy:
                 progress = self.animation_timer / 90.0
                 self.x = 400 + (self.target_x - 400) * progress
                 self.y = self.target_y - 20
+                # Determinar dirección basada en el movimiento
+                if self.target_x > 400:
+                    self.direction = 2  # right
+                elif self.target_x < 400:
+                    self.direction = 1  # left
+                else:
+                    self.direction = 0  # down
             else:
                 self.animation_phase = 2
                 self.animation_timer = 0
@@ -259,6 +317,7 @@ class Enemy:
                 self.animation_phase = 3
                 self.animation_timer = 0
                 self.angle = 90  # Mirando hacia el frente
+                self.direction = 0  # down (frente)
                 
         elif self.animation_phase == 3:  # Mirar hacia el frente
             self.visible = True
@@ -290,50 +349,15 @@ class Enemy:
         """Dibuja el Goblin King"""
         if not self.visible and self.animation_phase < 3:
             return
-            
-        # Cuerpo delgado (capa larga negra)
-        pygame.draw.rect(screen, BLACK, (self.x + 8, self.y + 35, 20, 45))
-        pygame.draw.rect(screen, DARK_GRAY, (self.x + 8, self.y + 35, 20, 45), 2)
         
-        # Cabeza más delgada
-        pygame.draw.ellipse(screen, SKIN, (self.x + 10, self.y + 20, 15, 20))
+        # Obtener el sprite del goblin según la dirección
+        sprite = sprite_manager.get_goblin_sprite(self.direction)
         
-        # Cabello rubio largo y despeinado
-        pygame.draw.ellipse(screen, YELLOW, (self.x + 8, self.y + 15, 19, 25))
-        pygame.draw.ellipse(screen, YELLOW, (self.x + 5, self.y + 10, 25, 30))
-        pygame.draw.ellipse(screen, YELLOW, (self.x + 3, self.y + 8, 29, 35))
-        pygame.draw.ellipse(screen, YELLOW, (self.x + 1, self.y + 5, 33, 40))
+        # Escalar el sprite para que se vea más grande
+        scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
         
-        # Cabeza encima del cabello
-        pygame.draw.ellipse(screen, SKIN, (self.x + 10, self.y + 20, 15, 20))
-        
-        # Ojos brillantes y misteriosos
-        pygame.draw.circle(screen, RED, (self.x + 15, self.y + 28), 2)
-        pygame.draw.circle(screen, RED, (self.x + 20, self.y + 28), 2)
-        pygame.draw.circle(screen, WHITE, (self.x + 15, self.y + 28), 1)
-        pygame.draw.circle(screen, WHITE, (self.x + 20, self.y + 28), 1)
-        
-        # Nariz puntiaguda
-        pygame.draw.polygon(screen, SKIN, [(self.x + 17, self.y + 32), (self.x + 15, self.y + 35), (self.x + 19, self.y + 35)])
-        
-        # Boca siniestra y puntiaguda
-        pygame.draw.arc(screen, BLACK, (self.x + 14, self.y + 33, 7, 6), 0, math.pi, 2)
-        
-        # Capa larga y dramática
-        pygame.draw.ellipse(screen, DARK_GRAY, (self.x - 5, self.y + 40, 45, 60))
-        pygame.draw.ellipse(screen, BLACK, (self.x - 5, self.y + 40, 45, 60), 2)
-        
-        # Brazos delgados
-        pygame.draw.line(screen, SKIN, (self.x + 6, self.y + 40), (self.x + 2, self.y + 55), 3)
-        pygame.draw.line(screen, SKIN, (self.x + 30, self.y + 40), (self.x + 34, self.y + 55), 3)
-        
-        # Piernas delgadas
-        pygame.draw.line(screen, BLACK, (self.x + 15, self.y + 80), (self.x + 15, self.y + 95), 4)
-        pygame.draw.line(screen, BLACK, (self.x + 20, self.y + 80), (self.x + 20, self.y + 95), 4)
-        
-        # Botas puntiagudas
-        pygame.draw.polygon(screen, BLACK, [(self.x + 12, self.y + 95), (self.x + 18, self.y + 95), (self.x + 20, self.y + 100)])
-        pygame.draw.polygon(screen, BLACK, [(self.x + 17, self.y + 95), (self.x + 23, self.y + 95), (self.x + 25, self.y + 100)])
+        # Dibujar el sprite
+        screen.blit(scaled_sprite, (self.x, self.y))
         
         # Dibujar globo de diálogo si está en fase de diálogo
         if self.animation_phase == 4:
@@ -502,46 +526,24 @@ class NPC:
         self.show_dialogue = False
         self.dialogue_duration = 180  # 3 segundos
         self.visible = True
+        self.direction = 0  # 0=down, 1=left, 2=right, 3=up
         
     def draw(self, screen):
         """Dibuja el NPC"""
         if not self.visible:
             return
-            
+        
+        # Obtener el sprite correcto según el género y dirección
         if self.gender == "male":
-            # Papá
-            # Cuerpo (camisa azul)
-            pygame.draw.rect(screen, DARK_BLUE, (self.x + 10, self.y + 25, 20, 25))
-            # Cabeza
-            pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-            # Cabello castaño oscuro
-            pygame.draw.circle(screen, DARK_BROWN, (self.x + 20, self.y + 15), 15)
-            pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-            # Ojos
-            pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 2)
-            pygame.draw.circle(screen, BLACK, (self.x + 24, self.y + 17), 2)
-            # Bigote
-            pygame.draw.arc(screen, DARK_BROWN, (self.x + 15, self.y + 22, 10, 4), 0, math.pi, 3)
-            # Piernas (pantalones)
-            pygame.draw.line(screen, GRAY, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
-            pygame.draw.line(screen, GRAY, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
+            sprite = sprite_manager.get_dad_sprite(self.direction)
         else:
-            # Mamá
-            # Cuerpo (vestido rosa claro)
-            pygame.draw.rect(screen, LIGHT_PINK, (self.x + 10, self.y + 25, 20, 25))
-            # Cabeza
-            pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-            # Cabello rubio
-            pygame.draw.circle(screen, YELLOW, (self.x + 20, self.y + 15), 15)
-            pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-            # Ojos
-            pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 2)
-            pygame.draw.circle(screen, BLACK, (self.x + 24, self.y + 17), 2)
-            # Boca sonriente
-            pygame.draw.arc(screen, BLACK, (self.x + 16, self.y + 20, 8, 6), 0, math.pi, 2)
-            # Piernas
-            pygame.draw.line(screen, BLACK, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
-            pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
+            sprite = sprite_manager.get_mom_sprite(self.direction)
+        
+        # Escalar el sprite para que se vea más grande
+        scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
+        
+        # Dibujar el sprite
+        screen.blit(scaled_sprite, (self.x, self.y))
         
         # Dibujar globo de diálogo si está activo
         if self.show_dialogue:
@@ -869,20 +871,42 @@ class Player:
         self.max_health = 100
         self.mana = 100 if character_class == MAGE else 0
         self.max_mana = 100 if character_class == MAGE else 0
+        self.direction = 0  # 0=down, 1=left, 2=right, 3=up
+        self.last_movement = [0, 0, 0, 0]  # [down, left, right, up] para detectar última dirección
         
     def handle_input(self, keys, obstacles):
         """Maneja la entrada del teclado con detección de colisiones"""
         old_x, old_y = self.x, self.y
         
-        # Movimiento con flechas
+        # Detectar movimiento y actualizar dirección
+        moved = False
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.x -= self.speed
+            self.direction = 1  # left
+            self.last_movement = [0, 1, 0, 0]
+            moved = True
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.x += self.speed
+            self.direction = 2  # right
+            self.last_movement = [0, 0, 1, 0]
+            moved = True
         if keys[pygame.K_UP] or keys[pygame.K_w]:
             self.y -= self.speed
+            self.direction = 3  # up
+            self.last_movement = [0, 0, 0, 1]
+            moved = True
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.y += self.speed
+            self.direction = 0  # down
+            self.last_movement = [1, 0, 0, 0]
+            moved = True
+            
+        # Si no se movió, mantener la última dirección
+        if not moved:
+            if self.last_movement[0]: self.direction = 0  # down
+            elif self.last_movement[1]: self.direction = 1  # left
+            elif self.last_movement[2]: self.direction = 2  # right
+            elif self.last_movement[3]: self.direction = 3  # up
             
         # Verificar colisiones con obstáculos
         if self.check_collision(obstacles):
@@ -901,130 +925,16 @@ class Player:
         return False
     
     def draw(self, screen):
-        """Dibuja el sprite de la niña según su clase"""
-        if self.character_class == KARATEKA:
-            self.draw_karateka(screen)
-        elif self.character_class == MAGE:
-            self.draw_mage(screen)
-        elif self.character_class == PIRATE:
-            self.draw_pirate(screen)
+        """Dibuja el sprite de la niña"""
+        # Obtener el sprite correcto según la dirección
+        sprite = sprite_manager.get_girl_sprite(self.direction)
+        
+        # Escalar el sprite para que se vea más grande
+        scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
+        
+        # Dibujar el sprite
+        screen.blit(scaled_sprite, (self.x, self.y))
     
-    def draw_karateka(self, screen):
-        """Dibuja el sprite de karateka"""
-        # Cuerpo (kimono blanco)
-        pygame.draw.rect(screen, WHITE, (self.x + 10, self.y + 25, 20, 25))
-        pygame.draw.rect(screen, BLACK, (self.x + 10, self.y + 25, 20, 25), 2)
-        
-        # Cabeza
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Cabello castaño más largo
-        pygame.draw.circle(screen, BROWN, (self.x + 20, self.y + 15), 15)
-        pygame.draw.ellipse(screen, BROWN, (self.x + 5, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 15, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 12, self.y + 5, 16, 20))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 18, self.y + 25, 12, 30))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 10, self.y + 25, 12, 30))
-        
-        # Cabeza encima del cabello
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Ojos
-        pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 2)
-        pygame.draw.circle(screen, BLACK, (self.x + 24, self.y + 17), 2)
-        
-        # Boca
-        pygame.draw.arc(screen, BLACK, (self.x + 16, self.y + 20, 8, 6), 0, math.pi, 2)
-        
-        # Brazos (en posición de karate)
-        pygame.draw.line(screen, SKIN, (self.x + 8, self.y + 30), (self.x + 3, self.y + 40), 4)
-        pygame.draw.line(screen, SKIN, (self.x + 32, self.y + 30), (self.x + 37, self.y + 40), 4)
-        
-        # Piernas (pantalones de karate)
-        pygame.draw.line(screen, WHITE, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
-        pygame.draw.line(screen, WHITE, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
-        pygame.draw.line(screen, BLACK, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 2)
-        pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 2)
-    
-    def draw_mage(self, screen):
-        """Dibuja el sprite de mago"""
-        # Cuerpo (túnica morada)
-        pygame.draw.rect(screen, (128, 0, 128), (self.x + 10, self.y + 25, 20, 25))
-        
-        # Cabeza
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Cabello castaño más largo
-        pygame.draw.circle(screen, BROWN, (self.x + 20, self.y + 15), 15)
-        pygame.draw.ellipse(screen, BROWN, (self.x + 5, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 15, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 12, self.y + 5, 16, 20))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 18, self.y + 25, 12, 30))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 10, self.y + 25, 12, 30))
-        
-        # Cabeza encima del cabello
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Ojos
-        pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 2)
-        pygame.draw.circle(screen, BLACK, (self.x + 24, self.y + 17), 2)
-        
-        # Boca
-        pygame.draw.arc(screen, BLACK, (self.x + 16, self.y + 20, 8, 6), 0, math.pi, 2)
-        
-        # Brazos
-        pygame.draw.line(screen, SKIN, (self.x + 10, self.y + 30), (self.x + 5, self.y + 40), 4)
-        pygame.draw.line(screen, SKIN, (self.x + 30, self.y + 30), (self.x + 35, self.y + 40), 4)
-        
-        # Piernas (pantalones morados)
-        pygame.draw.line(screen, (128, 0, 128), (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
-        pygame.draw.line(screen, (128, 0, 128), (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
-        
-        # Sombrero de mago
-        pygame.draw.circle(screen, (64, 0, 64), (self.x + 20, self.y + 8), 8)
-        pygame.draw.circle(screen, (64, 0, 64), (self.x + 20, self.y + 12), 10)
-    
-    def draw_pirate(self, screen):
-        """Dibuja el sprite de pirata"""
-        # Cuerpo (chaqueta de pirata)
-        pygame.draw.rect(screen, DARK_BLUE, (self.x + 10, self.y + 25, 20, 25))
-        
-        # Cabeza
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Cabello castaño más largo
-        pygame.draw.circle(screen, BROWN, (self.x + 20, self.y + 15), 15)
-        pygame.draw.ellipse(screen, BROWN, (self.x + 5, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 15, self.y + 10, 20, 25))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 12, self.y + 5, 16, 20))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 18, self.y + 25, 12, 30))
-        pygame.draw.ellipse(screen, BROWN, (self.x + 10, self.y + 25, 12, 30))
-        
-        # Cabeza encima del cabello
-        pygame.draw.circle(screen, SKIN, (self.x + 20, self.y + 20), 12)
-        
-        # Ojos
-        pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 2)
-        pygame.draw.circle(screen, BLACK, (self.x + 24, self.y + 17), 2)
-        
-        # Boca
-        pygame.draw.arc(screen, BLACK, (self.x + 16, self.y + 20, 8, 6), 0, math.pi, 2)
-        
-        # Brazos
-        pygame.draw.line(screen, SKIN, (self.x + 10, self.y + 30), (self.x + 5, self.y + 40), 4)
-        pygame.draw.line(screen, SKIN, (self.x + 30, self.y + 30), (self.x + 35, self.y + 40), 4)
-        
-        # Piernas (pantalones de pirata)
-        pygame.draw.line(screen, BROWN, (self.x + 15, self.y + 50), (self.x + 15, self.y + 60), 4)
-        pygame.draw.line(screen, BROWN, (self.x + 25, self.y + 50), (self.x + 25, self.y + 60), 4)
-        
-        # Parche en el ojo
-        pygame.draw.circle(screen, BLACK, (self.x + 16, self.y + 17), 4)
-        pygame.draw.line(screen, BLACK, (self.x + 12, self.y + 13), (self.x + 20, self.y + 21), 2)
-        
-        # Sombrero de pirata
-        pygame.draw.ellipse(screen, BLACK, (self.x + 8, self.y + 5, 24, 12))
-        pygame.draw.ellipse(screen, WHITE, (self.x + 8, self.y + 5, 24, 12), 2)
 
 class Game: 
     def __init__(self):
