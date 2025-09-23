@@ -1,11 +1,23 @@
 import pygame
 import sys
 import math
+import random
 
 # Cargar el sprite sheet
 SPRITE_SHEET = pygame.image.load("sprites.png")
 SPRITE_WIDTH = 32  # Ancho de cada sprite individual
 SPRITE_HEIGHT = 32  # Alto de cada sprite individual
+
+# Cargar los sprites individuales
+PLAYER_SPRITE_SHEET = pygame.image.load("human_8.png")
+MOM_SPRITE_SHEET = pygame.image.load("human_4.png")
+DAD_SPRITE_SHEET = pygame.image.load("human_1.png")
+GOBLIN_KING_SPRITE_SHEET = pygame.image.load("human_7.png")
+
+# Cargar sprites de enemigos goblins
+GOBLIN_SPRITE_2 = pygame.image.load("enemy_2.png")
+GOBLIN_SPRITE_4 = pygame.image.load("enemy_4.png")
+GOBLIN_SPRITE_5 = pygame.image.load("enemy_5.png")
 
 # Definir las posiciones de los sprites en el sprite sheet (fila, columna)
 # Basado en la descripción: 8 filas x 10 columnas, cada sprite 32x32
@@ -29,6 +41,13 @@ GOBLIN_SPRITE_COL = 8  # Columna 9 (índice 8)
 class SpriteManager:
     def __init__(self):
         self.sprite_sheet = SPRITE_SHEET
+        self.player_sprite_sheet = PLAYER_SPRITE_SHEET
+        self.mom_sprite_sheet = MOM_SPRITE_SHEET
+        self.dad_sprite_sheet = DAD_SPRITE_SHEET
+        self.goblin_king_sprite_sheet = GOBLIN_KING_SPRITE_SHEET
+        self.goblin_sprite_2 = GOBLIN_SPRITE_2
+        self.goblin_sprite_4 = GOBLIN_SPRITE_4
+        self.goblin_sprite_5 = GOBLIN_SPRITE_5
         
     def get_sprite(self, row, col, direction=0):
         """Obtiene un sprite específico del sprite sheet"""
@@ -58,6 +77,50 @@ class SpriteManager:
     
     def get_goblin_sprite(self, direction=0):
         return self.get_sprite(GOBLIN_SPRITE_ROW, GOBLIN_SPRITE_COL, direction)
+    
+    def get_player_sprite(self, direction=0):
+        """Obtiene el sprite del personaje principal desde human_8.png"""
+        return self.get_individual_sprite(self.player_sprite_sheet, direction)
+    
+    def get_mom_sprite_new(self, direction=0):
+        """Obtiene el sprite de la mamá desde human_4.png"""
+        return self.get_individual_sprite(self.mom_sprite_sheet, direction)
+    
+    def get_dad_sprite_new(self, direction=0):
+        """Obtiene el sprite del papá desde human_1.png"""
+        return self.get_individual_sprite(self.dad_sprite_sheet, direction)
+    
+    def get_goblin_king_sprite(self, direction=0):
+        """Obtiene el sprite del Goblin King desde human_7.png"""
+        return self.get_individual_sprite(self.goblin_king_sprite_sheet, direction)
+    
+    def get_goblin_2_sprite(self, direction=0):
+        """Obtiene el sprite del goblin desde enemy_2.png"""
+        return self.get_individual_sprite(self.goblin_sprite_2, direction)
+    
+    def get_goblin_4_sprite(self, direction=0):
+        """Obtiene el sprite del goblin desde enemy_4.png"""
+        return self.get_individual_sprite(self.goblin_sprite_4, direction)
+    
+    def get_goblin_5_sprite(self, direction=0):
+        """Obtiene el sprite del goblin desde enemy_5.png"""
+        return self.get_individual_sprite(self.goblin_sprite_5, direction)
+    
+    def get_individual_sprite(self, sprite_sheet, direction=0):
+        """Obtiene un sprite individual con 4 direcciones"""
+        # Cada sprite individual tiene 4 direcciones: down (0), left (1), right (2), up (3)
+        x = direction * SPRITE_WIDTH
+        y = 0  # Solo hay una fila en estos sprite sheets
+        
+        # Verificar que las coordenadas estén dentro del sprite sheet
+        sheet_width = sprite_sheet.get_width()
+        sheet_height = sprite_sheet.get_height()
+        
+        if x + SPRITE_WIDTH > sheet_width or y + SPRITE_HEIGHT > sheet_height:
+            # Usar el primer sprite como fallback
+            return sprite_sheet.subsurface((0, 0, SPRITE_WIDTH, SPRITE_HEIGHT))
+        
+        return sprite_sheet.subsurface((x, y, SPRITE_WIDTH, SPRITE_HEIGHT))
 
 # Instancia global del sprite manager
 sprite_manager = SpriteManager()
@@ -353,14 +416,93 @@ class Enemy:
                 self.dialogue_timer = 0
             elif self.dialogue_phase == 5 and self.dialogue_timer > 180:  # Escape por 3 segundos
                 self.animation_phase = 6  # Terminar
+
+class RandomGoblin:
+    def __init__(self, x, y, sprite_type):
+        """Inicializa un goblin aleatorio"""
+        self.x = x
+        self.y = y
+        self.width = 30
+        self.height = 40
+        self.sprite_type = sprite_type  # 2, 4, o 5
+        self.direction = random.randint(0, 3)  # Dirección aleatoria
+        self.move_timer = 0
+        self.change_direction_timer = 0
+        self.speed = 2
+        self.visible = True
+        
+        # Propiedades de combate
+        self.health = 50
+        self.max_health = 50
+        self.attack_damage = 15
+        self.attack_timer = 0
+        self.attack_cooldown = 60  # 1 segundo
+        self.in_combat = False
+        self.target_player = False
+        
+    def update(self):
+        """Actualiza el movimiento del goblin"""
+        if not self.visible:
+            return
+            
+        self.move_timer += 1
+        self.change_direction_timer += 1
+        
+        # Cambiar dirección aleatoriamente cada 60 frames (1 segundo)
+        if self.change_direction_timer >= 60:
+            self.direction = random.randint(0, 3)
+            self.change_direction_timer = 0
+        
+        # Moverse en la dirección actual
+        old_x, old_y = self.x, self.y
+        
+        if self.direction == 0:  # down
+            self.y += self.speed
+        elif self.direction == 1:  # left
+            self.x -= self.speed
+        elif self.direction == 2:  # right
+            self.x += self.speed
+        elif self.direction == 3:  # up
+            self.y -= self.speed
+        
+        # Mantener dentro de la pantalla
+        self.x = max(50, min(self.x, WINDOW_WIDTH - self.width - 50))
+        self.y = max(50, min(self.y, WINDOW_HEIGHT - self.height - 50))
+        
+        # Si se sale de la pantalla, cambiar dirección
+        if self.x == 50 or self.x == WINDOW_WIDTH - self.width - 50:
+            self.direction = random.choice([0, 3])  # up o down
+        if self.y == 50 or self.y == WINDOW_HEIGHT - self.height - 50:
+            self.direction = random.choice([1, 2])  # left o right
+    
+    def draw(self, screen):
+        """Dibuja el goblin aleatorio"""
+        if not self.visible:
+            return
+            
+        # Obtener el sprite según el tipo
+        if self.sprite_type == 2:
+            sprite = sprite_manager.get_goblin_2_sprite(self.direction)
+        elif self.sprite_type == 4:
+            sprite = sprite_manager.get_goblin_4_sprite(self.direction)
+        elif self.sprite_type == 5:
+            sprite = sprite_manager.get_goblin_5_sprite(self.direction)
+        else:
+            sprite = sprite_manager.get_goblin_2_sprite(self.direction)  # fallback
+        
+        # Escalar el sprite
+        scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
+        
+        # Dibujar el sprite
+        screen.blit(scaled_sprite, (self.x, self.y))
             
     def draw(self, screen):
         """Dibuja el Goblin King"""
         if not self.visible and self.animation_phase < 3:
             return
         
-        # Obtener el sprite del goblin según la dirección
-        sprite = sprite_manager.get_goblin_sprite(self.direction)
+        # Obtener el sprite del Goblin King según la dirección
+        sprite = sprite_manager.get_goblin_king_sprite(self.direction)
         
         # Escalar el sprite para que se vea más grande
         scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
@@ -544,9 +686,9 @@ class NPC:
         
         # Obtener el sprite correcto según el género y dirección
         if self.gender == "male":
-            sprite = sprite_manager.get_dad_sprite(self.direction)
+            sprite = sprite_manager.get_dad_sprite_new(self.direction)
         else:
-            sprite = sprite_manager.get_mom_sprite(self.direction)
+            sprite = sprite_manager.get_mom_sprite_new(self.direction)
         
         # Escalar el sprite para que se vea más grande
         scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
@@ -589,10 +731,34 @@ class NPC:
         text2_rect = text2.get_rect(center=(bubble_x + bubble_width//2, bubble_y + bubble_height//2 + 8))
         screen.blit(text2, text2_rect)
     
-    def start_dialogue(self):
-        """Inicia el diálogo del NPC"""
+    def start_dialogue(self, player_x=None, player_y=None):
+        """Inicia el diálogo del NPC y hace que mire al jugador"""
         self.show_dialogue = True
         self.dialogue_timer = 0
+        
+        # Hacer que el NPC mire hacia el jugador si se proporcionan coordenadas
+        if player_x is not None and player_y is not None:
+            self.face_player(player_x, player_y)
+    
+    def face_player(self, player_x, player_y):
+        """Hace que el NPC mire hacia el jugador"""
+        # Calcular la dirección hacia el jugador
+        dx = player_x - (self.x + self.width // 2)
+        dy = player_y - (self.y + self.height // 2)
+        
+        # Determinar la dirección basada en la diferencia mayor
+        if abs(dx) > abs(dy):
+            # Movimiento horizontal
+            if dx > 0:
+                self.direction = 2  # right
+            else:
+                self.direction = 1  # left
+        else:
+            # Movimiento vertical
+            if dy > 0:
+                self.direction = 0  # down
+            else:
+                self.direction = 3  # up
     
     def update_dialogue(self):
         """Actualiza el temporizador del diálogo"""
@@ -920,7 +1086,7 @@ class Player:
     def draw(self, screen):
         """Dibuja el sprite de la niña"""
         # Obtener el sprite correcto según la dirección
-        sprite = sprite_manager.get_girl_sprite(self.direction)
+        sprite = sprite_manager.get_player_sprite(self.direction)
         
         # Escalar el sprite para que se vea más grande
         scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
@@ -950,6 +1116,7 @@ class Game:
         self.father = None
         self.mother = None
         self.enemy = None
+        self.random_goblins = []  # Lista de goblins aleatorios
         
         # Variables de cinemática
         self.flash_timer = 0
@@ -988,15 +1155,15 @@ class Game:
         player_name = self.name_input.player_name
         character_class = self.class_selection.selected_class
         
-        # Crear el jugador con nombre y clase
-        self.player = Player(400, 450, player_name, character_class)
+        # Crear el jugador con nombre y clase (en el piso azul de la cocina)
+        self.player = Player(550, 450, player_name, character_class)
         
         # Crear el ambiente
         self.environment = Environment()
         
-        # Crear los NPCs (padres en el comedor)
-        self.father = NPC(470, 180, "male")  # Papá junto a la mesa en la sala de estar
-        self.mother = NPC(520, 180, "female")  # Mamá junto a la mesa en la sala de estar
+        # Crear los NPCs (padres sentados en sillones junto a la mesita)
+        self.father = NPC(480, 160, "male")  # Papá en sillón izquierdo
+        self.mother = NPC(530, 160, "female")  # Mamá en sillón derecho
         
         # Crear el enemigo (inicialmente invisible) - aparece desde la entrada al sótano
         self.enemy = Enemy(100, 400)
@@ -1061,10 +1228,30 @@ class Game:
         self.enemy.animation_phase = 0
         self.enemy.animation_timer = 0
         
+        # Crear los goblins aleatorios
+        self.random_goblins = []
+        
+        # Posiciones aleatorias para los goblins
+        positions = [
+            (100, 100),  # Esquina superior izquierda
+            (400, 200),  # Centro
+            (600, 400)   # Esquina inferior derecha
+        ]
+        
+        sprite_types = [2, 4, 5]  # enemy_2, enemy_4, enemy_5
+        
+        for i, (x, y) in enumerate(positions):
+            goblin = RandomGoblin(x, y, sprite_types[i])
+            self.random_goblins.append(goblin)
+        
     def update_cinematic(self):
         """Actualiza la animación de la cinemática"""
         # Actualizar el enemigo
         self.enemy.update()
+        
+        # Actualizar los goblins aleatorios
+        for goblin in self.random_goblins:
+            goblin.update()
         
         # Actualizar el flash
         if self.flash_timer < self.flash_duration:
@@ -1087,12 +1274,12 @@ class Game:
         # Verificar colisión con el padre
         father_rect = pygame.Rect(self.father.x, self.father.y, self.father.width, self.father.height)
         if player_rect.colliderect(father_rect) and not self.father.show_dialogue:
-            self.father.start_dialogue()
+            self.father.start_dialogue(self.player.x, self.player.y)
         
         # Verificar colisión con la madre
         mother_rect = pygame.Rect(self.mother.x, self.mother.y, self.mother.width, self.mother.height)
         if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
-            self.mother.start_dialogue()
+            self.mother.start_dialogue(self.player.x, self.player.y)
     
     def process_action(self):
         """Procesa la acción del botón ENTER"""
@@ -1102,23 +1289,34 @@ class Game:
         # Verificar proximidad con el padre
         father_rect = pygame.Rect(self.father.x - 20, self.father.y - 20, self.father.width + 40, self.father.height + 40)
         if player_rect.colliderect(father_rect) and not self.father.show_dialogue:
-            self.father.start_dialogue()
+            self.father.start_dialogue(self.player.x, self.player.y)
         
         # Verificar proximidad con la madre
         mother_rect = pygame.Rect(self.mother.x - 20, self.mother.y - 20, self.mother.width + 40, self.mother.height + 40)
         if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
-            self.mother.start_dialogue()
+            self.mother.start_dialogue(self.player.x, self.player.y)
         
-        # Verificar si está en la zona de la entrada al sótano para activar cinemática
-        entrance_x = 80
-        entrance_width = 40
-        entrance_y = 380
-        if (not self.cinematic_triggered and 
-            self.player.x >= entrance_x and 
-            self.player.x <= entrance_x + entrance_width and
-            self.player.y >= entrance_y - 20 and
-            self.player.y <= entrance_y + 20):
-            self.trigger_cinematic()
+        # Verificar si está en alguna escalera o salida para activar cinemática
+        if not self.cinematic_triggered:
+            # Escalera hacia abajo (sótano) - izquierda
+            if (self.player.x >= 75 and self.player.x <= 85 and 
+                self.player.y >= 375 and self.player.y <= 385):
+                self.trigger_cinematic()
+            
+            # Escalera hacia arriba - área central
+            elif (self.player.x >= 300 and self.player.x <= 350 and 
+                  self.player.y >= 240 and self.player.y <= 260):
+                self.trigger_cinematic()
+            
+            # Salida derecha (puerta principal)
+            elif (self.player.x >= 750 and self.player.x <= 800 and 
+                  self.player.y >= 250 and self.player.y <= 350):
+                self.trigger_cinematic()
+            
+            # Salida superior (ventana/puerta)
+            elif (self.player.x >= 400 and self.player.x <= 500 and 
+                  self.player.y >= 0 and self.player.y <= 30):
+                self.trigger_cinematic()
         
     def draw(self):
         """Dibuja todos los elementos en pantalla"""
@@ -1163,6 +1361,10 @@ class Game:
             
             # Dibujar el enemigo
             self.enemy.draw(self.screen)
+            
+            # Dibujar los goblins aleatorios
+            for goblin in self.random_goblins:
+                goblin.draw(self.screen)
             
             # Efecto de flash
             self.draw_flash_effect()
