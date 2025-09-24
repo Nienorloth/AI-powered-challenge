@@ -9,10 +9,16 @@ SPRITE_WIDTH = 32  # Ancho de cada sprite individual
 SPRITE_HEIGHT = 32  # Alto de cada sprite individual
 
 # Cargar los sprites individuales
-PLAYER_SPRITE_SHEET = pygame.image.load("human_8.png")
+MAIN_CHAR_SPRITE_SHEET = pygame.image.load("main_char.png")
 MOM_SPRITE_SHEET = pygame.image.load("human_4.png")
 DAD_SPRITE_SHEET = pygame.image.load("human_1.png")
 GOBLIN_KING_SPRITE_SHEET = pygame.image.load("human_7.png")
+
+# Configuración del sprite sheet del personaje principal
+MAIN_CHAR_SPRITE_WIDTH = 32  # Ancho de cada sprite individual
+MAIN_CHAR_SPRITE_HEIGHT = 32  # Alto de cada sprite individual
+MAIN_CHAR_FRAMES_PER_DIRECTION = 3  # 3 fotogramas por dirección
+MAIN_CHAR_ANIMATION_SPEED = 10  # Velocidad de animación (frames entre cambios)
 
 # Cargar sprites de enemigos goblins
 GOBLIN_SPRITE_2 = pygame.image.load("enemy_2.png")
@@ -41,7 +47,7 @@ GOBLIN_SPRITE_COL = 8  # Columna 9 (índice 8)
 class SpriteManager:
     def __init__(self):
         self.sprite_sheet = SPRITE_SHEET
-        self.player_sprite_sheet = PLAYER_SPRITE_SHEET
+        self.main_char_sprite_sheet = MAIN_CHAR_SPRITE_SHEET
         self.mom_sprite_sheet = MOM_SPRITE_SHEET
         self.dad_sprite_sheet = DAD_SPRITE_SHEET
         self.goblin_king_sprite_sheet = GOBLIN_KING_SPRITE_SHEET
@@ -78,9 +84,121 @@ class SpriteManager:
     def get_goblin_sprite(self, direction=0):
         return self.get_sprite(GOBLIN_SPRITE_ROW, GOBLIN_SPRITE_COL, direction)
     
-    def get_player_sprite(self, direction=0):
-        """Obtiene el sprite del personaje principal desde human_8.png"""
-        return self.get_individual_sprite(self.player_sprite_sheet, direction)
+    def get_player_sprite(self, direction=0, frame=0):
+        """Obtiene el sprite del personaje principal desde main_char.png con animación"""
+        return self.get_animated_sprite(self.main_char_sprite_sheet, direction, frame)
+    
+    def get_animated_sprite(self, sprite_sheet, direction, frame):
+        """Obtiene un sprite animado del sprite sheet"""
+        # Fila 0 = Abajo, Fila 1 = Izquierda, Fila 2 = Derecha, Fila 3 = Arriba
+        # Cada fila tiene 3 fotogramas de animación
+        row = direction
+        col = frame % MAIN_CHAR_FRAMES_PER_DIRECTION
+        
+        x = col * MAIN_CHAR_SPRITE_WIDTH
+        y = row * MAIN_CHAR_SPRITE_HEIGHT
+        
+        # Verificar que las coordenadas estén dentro del sprite sheet
+        sheet_width = sprite_sheet.get_width()
+        sheet_height = sprite_sheet.get_height()
+        
+        if x + MAIN_CHAR_SPRITE_WIDTH > sheet_width or y + MAIN_CHAR_SPRITE_HEIGHT > sheet_height:
+            # Usar el primer sprite como fallback
+            return sprite_sheet.subsurface((0, 0, MAIN_CHAR_SPRITE_WIDTH, MAIN_CHAR_SPRITE_HEIGHT))
+        
+        return sprite_sheet.subsurface((x, y, MAIN_CHAR_SPRITE_WIDTH, MAIN_CHAR_SPRITE_HEIGHT))
+
+class Item:
+    def __init__(self, item_type, name, description, value=0):
+        """Inicializa un item"""
+        self.type = item_type
+        self.name = name
+        self.description = description
+        self.value = value  # Valor en chelines o efecto
+        self.quantity = 1
+    
+    def use(self, player):
+        """Usa el item en el jugador"""
+        if self.type == ITEM_POTION_HP:
+            player.health = min(player.max_health, player.health + 50)
+            return True
+        elif self.type == ITEM_POTION_MANA:
+            if player.character_class == MAGE:
+                player.mana = min(player.max_mana, player.mana + 50)
+                return True
+        elif self.type == ITEM_ANTIDOTE:
+            # Cura efectos de veneno si los hay
+            return True
+        return False
+
+class Inventory:
+    def __init__(self):
+        """Inicializa el inventario"""
+        self.items = {}
+        self.chelines = 20  # Dinero inicial
+        self.max_slots = 20
+        
+        # Agregar item inicial
+        self.add_item(Item(ITEM_POTION_HP, "Poción de Vida", "Restaura 50 HP", 10))
+    
+    def add_item(self, item):
+        """Agrega un item al inventario"""
+        if item.type == ITEM_CHELINES:
+            self.chelines += item.value
+            return True
+        
+        if len(self.items) >= self.max_slots:
+            return False  # Inventario lleno
+        
+        # Si ya existe el item, incrementar cantidad
+        for existing_item in self.items.values():
+            if existing_item.type == item.type:
+                existing_item.quantity += 1
+                return True
+        
+        # Agregar nuevo item
+        item_id = len(self.items)
+        self.items[item_id] = item
+        return True
+    
+    def remove_item(self, item_id):
+        """Remueve un item del inventario"""
+        if item_id in self.items:
+            item = self.items[item_id]
+            if item.quantity > 1:
+                item.quantity -= 1
+            else:
+                del self.items[item_id]
+            return True
+        return False
+    
+    def get_item_count(self):
+        """Retorna el número total de items"""
+        return sum(item.quantity for item in self.items.values())
+    
+    def draw(self, screen, x, y):
+        """Dibuja el inventario en pantalla"""
+        font = pygame.font.Font(None, 24)
+        
+        # Fondo del inventario
+        pygame.draw.rect(screen, (50, 50, 50), (x, y, 300, 200))
+        pygame.draw.rect(screen, WHITE, (x, y, 300, 200), 2)
+        
+        # Título
+        title = font.render("INVENTARIO", True, WHITE)
+        screen.blit(title, (x + 10, y + 10))
+        
+        # Chelines
+        chelines_text = font.render(f"Chelines: {self.chelines}", True, YELLOW)
+        screen.blit(chelines_text, (x + 10, y + 40))
+        
+        # Items
+        y_offset = 70
+        for item_id, item in self.items.items():
+            if y_offset + 20 < y + 180:  # No salirse del inventario
+                item_text = font.render(f"{item.name} x{item.quantity}", True, WHITE)
+                screen.blit(item_text, (x + 10, y + y_offset))
+                y_offset += 25
     
     def get_mom_sprite_new(self, direction=0):
         """Obtiene el sprite de la mamá desde human_4.png"""
@@ -165,11 +283,19 @@ KARATEKA = "karateka"
 MAGE = "mage"
 PIRATE = "pirate"
 
+# Tipos de items
+ITEM_POTION_HP = "potion_hp"
+ITEM_POTION_MANA = "potion_mana"
+ITEM_ANTIDOTE = "antidote"
+ITEM_GEM = "gem"
+ITEM_CHELINES = "chelines"
+
 # Estados del juego
 NAME_INPUT = "name_input"
 CLASS_SELECTION = "class_selection"
 PLAYING = "playing"
 CINEMATIC = "cinematic"
+COMBAT = "combat"
 
 # Dimensiones de las habitaciones
 ROOM_WIDTH = 800
@@ -439,41 +565,111 @@ class RandomGoblin:
         self.attack_cooldown = 60  # 1 segundo
         self.in_combat = False
         self.target_player = False
+        self.combat_mode = False  # Activar cuando los padres se van
+        self.is_dead = False
+        self.loot_given = False
         
-    def update(self):
+    def update(self, player=None):
         """Actualiza el movimiento del goblin"""
         if not self.visible:
             return
+        
+        # Si está en modo combate, perseguir al jugador
+        if self.combat_mode and player:
+            self.pursue_player(player)
+        else:
+            # Movimiento aleatorio normal
+            self.move_timer += 1
+            self.change_direction_timer += 1
             
-        self.move_timer += 1
-        self.change_direction_timer += 1
-        
-        # Cambiar dirección aleatoriamente cada 60 frames (1 segundo)
-        if self.change_direction_timer >= 60:
-            self.direction = random.randint(0, 3)
-            self.change_direction_timer = 0
-        
-        # Moverse en la dirección actual
-        old_x, old_y = self.x, self.y
-        
-        if self.direction == 0:  # down
-            self.y += self.speed
-        elif self.direction == 1:  # left
-            self.x -= self.speed
-        elif self.direction == 2:  # right
-            self.x += self.speed
-        elif self.direction == 3:  # up
-            self.y -= self.speed
+            # Cambiar dirección aleatoriamente cada 60 frames (1 segundo)
+            if self.change_direction_timer >= 60:
+                self.direction = random.randint(0, 3)
+                self.change_direction_timer = 0
+            
+            # Moverse en la dirección actual
+            if self.direction == 0:  # down
+                self.y += self.speed
+            elif self.direction == 1:  # left
+                self.x -= self.speed
+            elif self.direction == 2:  # right
+                self.x += self.speed
+            elif self.direction == 3:  # up
+                self.y -= self.speed
         
         # Mantener dentro de la pantalla
         self.x = max(50, min(self.x, WINDOW_WIDTH - self.width - 50))
         self.y = max(50, min(self.y, WINDOW_HEIGHT - self.height - 50))
         
-        # Si se sale de la pantalla, cambiar dirección
-        if self.x == 50 or self.x == WINDOW_WIDTH - self.width - 50:
-            self.direction = random.choice([0, 3])  # up o down
-        if self.y == 50 or self.y == WINDOW_HEIGHT - self.height - 50:
-            self.direction = random.choice([1, 2])  # left o right
+        # Actualizar timer de ataque
+        if self.attack_timer > 0:
+            self.attack_timer -= 1
+    
+    def pursue_player(self, player):
+        """Persigue al jugador cuando está en modo combate"""
+        # Calcular dirección hacia el jugador
+        dx = player.x - self.x
+        dy = player.y - self.y
+        
+        # Determinar dirección de movimiento
+        if abs(dx) > abs(dy):
+            if dx > 0:
+                self.direction = 2  # right
+                self.x += self.speed
+            else:
+                self.direction = 1  # left
+                self.x -= self.speed
+        else:
+            if dy > 0:
+                self.direction = 0  # down
+                self.y += self.speed
+            else:
+                self.direction = 3  # up
+                self.y -= self.speed
+    
+    def check_collision_with_player(self, player):
+        """Verifica si está colisionando con el jugador"""
+        goblin_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        player_rect = pygame.Rect(player.x, player.y, player.width, player.height)
+        return goblin_rect.colliderect(player_rect)
+    
+    def attack_player(self, player):
+        """Ataca al jugador"""
+        if self.attack_timer <= 0:
+            player.health -= self.attack_damage
+            self.attack_timer = self.attack_cooldown
+            return True
+        return False
+    
+    def take_damage(self, damage):
+        """Recibe daño"""
+        self.health -= damage
+        if self.health <= 0:
+            self.is_dead = True
+            return True
+        return False
+    
+    def give_loot(self, player):
+        """Da loot aleatorio al jugador cuando muere"""
+        if self.is_dead and not self.loot_given:
+            self.loot_given = True
+            
+            # Dar 5 chelines
+            player.inventory.add_item(Item(ITEM_CHELINES, "Chelines", "Moneda del reino", 5))
+            
+            # Dar item aleatorio
+            loot_options = [
+                Item(ITEM_POTION_HP, "Poción de Vida", "Restaura 50 HP", 10),
+                Item(ITEM_POTION_MANA, "Poción de Maná", "Restaura 50 MP", 10),
+                Item(ITEM_ANTIDOTE, "Antídoto", "Cura venenos", 15),
+                Item(ITEM_GEM, "Gema Preciosa", "Vale mucho dinero", 25)
+            ]
+            
+            random_loot = random.choice(loot_options)
+            player.inventory.add_item(random_loot)
+            
+            return random_loot
+        return None
     
     def draw(self, screen):
         """Dibuja el goblin aleatorio"""
@@ -779,37 +975,44 @@ class Environment:
         """Configura todos los obstáculos de la casa basados en la nueva imagen"""
         self.obstacles = []
         
-        # Paredes exteriores (ajustadas para la nueva imagen)
+        # Paredes exteriores (protección completa contra áreas negras)
         self.obstacles.append(pygame.Rect(0, 0, WINDOW_WIDTH, 25))  # Pared superior
         self.obstacles.append(pygame.Rect(0, 0, 25, WINDOW_HEIGHT))  # Pared izquierda
         self.obstacles.append(pygame.Rect(WINDOW_WIDTH-25, 0, 25, WINDOW_HEIGHT))  # Pared derecha
         self.obstacles.append(pygame.Rect(0, WINDOW_HEIGHT-25, WINDOW_WIDTH, 25))  # Pared inferior
         
-        # Paredes internas
-        # Pared entre dormitorio y sala de estar
-        self.obstacles.append(pygame.Rect(200, 0, 20, 250))  # Pared vertical izquierda
-        # Pared entre sala de estar y cocina
-        self.obstacles.append(pygame.Rect(450, 0, 20, 300))  # Pared vertical derecha
-        # Pared horizontal entre habitaciones superiores e inferiores
-        self.obstacles.append(pygame.Rect(200, 250, 250, 20))  # Pared horizontal
+        # Paredes internas (con pasillos amplios para movimiento entre habitaciones)
+        # Pared entre dormitorio y sala de estar - con pasillo amplio
+        self.obstacles.append(pygame.Rect(200, 0, 15, 200))  # Pared vertical izquierda (más corta)
+        self.obstacles.append(pygame.Rect(200, 280, 15, 120))  # Continuación de la pared (pasillo de 80px)
+        # Pared entre sala de estar y cocina - con pasillo amplio
+        self.obstacles.append(pygame.Rect(465, 0, 15, 200))  # Pared vertical derecha (más corta)
+        self.obstacles.append(pygame.Rect(465, 280, 15, 120))  # Continuación de la pared (pasillo de 80px)
+        # Pared horizontal entre habitaciones superiores e inferiores - con pasillo amplio
+        self.obstacles.append(pygame.Rect(200, 250, 40, 15))  # Pared horizontal izquierda
+        self.obstacles.append(pygame.Rect(285, 250, 40, 15))  # Pared horizontal derecha (pasillo de 45px en el medio)
         
-        # Muebles del dormitorio (superior izquierdo)
-        self.obstacles.append(pygame.Rect(30, 50, 80, 120))  # Cama
+        # Muebles del dormitorio (superior izquierdo) - obstáculos precisos
+        self.obstacles.append(pygame.Rect(30, 60, 80, 120))  # Cama
         self.obstacles.append(pygame.Rect(120, 80, 60, 40))  # Estante con tetera
         
-        # Muebles de la sala de estar (superior derecho)
+        # Muebles de la sala de estar (superior derecho) - obstáculos para sillones y mesa
         self.obstacles.append(pygame.Rect(480, 80, 80, 60))  # Chimenea
-        self.obstacles.append(pygame.Rect(470, 160, 100, 60))  # Mesa con sillas
+        self.obstacles.append(pygame.Rect(470, 160, 100, 60))  # Mesa con sillas (área de los padres)
         self.obstacles.append(pygame.Rect(500, 40, 40, 30))  # Estante con plantas
         
-        # Muebles del área central
-        self.obstacles.append(pygame.Rect(220, 280, 40, 60))  # Perchero con canasta
+        # Sillones individuales donde están los padres
+        self.obstacles.append(pygame.Rect(475, 155, 25, 35))  # Sillón izquierdo (papá)
+        self.obstacles.append(pygame.Rect(540, 155, 25, 35))  # Sillón derecho (mamá)
+        
+        # Muebles del área central (más pequeños para no bloquear pasillos)
+        self.obstacles.append(pygame.Rect(230, 290, 25, 40))  # Perchero con canasta (más pequeño)
         
         # Muebles del área de almacenamiento (inferior izquierdo)
         self.obstacles.append(pygame.Rect(30, 300, 120, 80))  # Estantes con jarras
         self.obstacles.append(pygame.Rect(80, 380, 40, 20))  # Escaleras al sótano
         
-        # Muebles de la cocina (inferior derecho)
+        # Muebles de la cocina (inferior derecho) - obstáculos completos
         self.obstacles.append(pygame.Rect(480, 320, 100, 40))  # Mostrador con fregadero
         self.obstacles.append(pygame.Rect(600, 320, 60, 40))  # Estufa
         self.obstacles.append(pygame.Rect(580, 360, 80, 60))  # Mesa de comedor
@@ -819,6 +1022,21 @@ class Environment:
         """Dibuja el ambiente completo de la casa"""
         # Dibujar el background de la casa
         screen.blit(self.background, (0, 0))
+        
+        # Cubrir el personaje que viene en la imagen de fondo
+        # Área en la sala debajo de la mesita y sillones donde están los padres
+        cover_areas = [
+            # Área debajo de los sillones de los padres (coordenadas ajustadas)
+            pygame.Rect(470, 220, 120, 80),  # Área principal debajo de la mesita
+            pygame.Rect(460, 210, 20, 30),   # Área adicional izquierda
+            pygame.Rect(580, 210, 20, 30),   # Área adicional derecha
+        ]
+        
+        # Dibujar rectángulos del color del piso para cubrir el personaje
+        for area in cover_areas:
+            # Usar un color similar al piso de la sala de estar
+            floor_color = (160, 130, 100)  # Color más claro para la sala
+            pygame.draw.rect(screen, floor_color, area)
         
     # Métodos de dibujo antiguos eliminados - ahora usamos background de imagen
     
@@ -1021,8 +1239,8 @@ class Player:
         """Inicializa el jugador"""
         self.x = x
         self.y = y
-        self.width = 40
-        self.height = 50
+        self.width = 64  # Mucho más ancho para mostrar la niña completa
+        self.height = 80  # Mucho más alto para mostrar la niña completa
         self.speed = PLAYER_SPEED
         self.name = name
         self.character_class = character_class
@@ -1032,6 +1250,14 @@ class Player:
         self.max_mana = 100 if character_class == MAGE else 0
         self.direction = 0  # 0=down, 1=left, 2=right, 3=up
         self.last_movement = [0, 0, 0, 0]  # [down, left, right, up] para detectar última dirección
+        
+        # Variables de animación
+        self.animation_frame = 0  # Frame actual de la animación (0-2)
+        self.animation_timer = 0  # Timer para controlar la velocidad de animación
+        self.is_moving = False  # Si el personaje se está moviendo
+        
+        # Inventario
+        self.inventory = Inventory()
         
     def handle_input(self, keys, obstacles):
         """Maneja la entrada del teclado con detección de colisiones"""
@@ -1060,12 +1286,23 @@ class Player:
             self.last_movement = [1, 0, 0, 0]
             moved = True
             
-        # Si no se movió, mantener la última dirección
-        if not moved:
+        # Actualizar estado de movimiento y animación
+        self.is_moving = moved
+        
+        if self.is_moving:
+            # Actualizar animación mientras se mueve
+            self.animation_timer += 1
+            if self.animation_timer >= MAIN_CHAR_ANIMATION_SPEED:
+                self.animation_frame = (self.animation_frame + 1) % MAIN_CHAR_FRAMES_PER_DIRECTION
+                self.animation_timer = 0
+        else:
+            # Si no se movió, mantener la última dirección y resetear animación
             if self.last_movement[0]: self.direction = 0  # down
             elif self.last_movement[1]: self.direction = 1  # left
             elif self.last_movement[2]: self.direction = 2  # right
             elif self.last_movement[3]: self.direction = 3  # up
+            # Mantener el primer frame cuando no se mueve
+            self.animation_frame = 0
             
         # Verificar colisiones con obstáculos
         if self.check_collision(obstacles):
@@ -1076,17 +1313,21 @@ class Player:
         self.y = max(0, min(self.y, WINDOW_HEIGHT - self.height))
     
     def check_collision(self, obstacles):
-        """Verifica colisiones con obstáculos"""
+        """Verifica colisiones con obstáculos definidos"""
         player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        
+        # Solo verificar colisiones con obstáculos definidos (sin detección de píxeles)
         for obstacle in obstacles:
             if player_rect.colliderect(obstacle):
                 return True
+            
         return False
     
+    
     def draw(self, screen):
-        """Dibuja el sprite de la niña"""
-        # Obtener el sprite correcto según la dirección
-        sprite = sprite_manager.get_player_sprite(self.direction)
+        """Dibuja el sprite del personaje principal con animaciones"""
+        # Obtener el sprite correcto según la dirección y frame de animación
+        sprite = sprite_manager.get_player_sprite(self.direction, self.animation_frame)
         
         # Escalar el sprite para que se vea más grande
         scaled_sprite = pygame.transform.scale(sprite, (self.width, self.height))
@@ -1117,6 +1358,7 @@ class Game:
         self.mother = None
         self.enemy = None
         self.random_goblins = []  # Lista de goblins aleatorios
+        self.show_inventory = False  # Mostrar inventario
         
         # Variables de cinemática
         self.flash_timer = 0
@@ -1142,6 +1384,9 @@ class Game:
                     if self.action_cooldown == 0:
                         self.action_pressed = True
                         self.action_cooldown = 30  # 0.5 segundos de cooldown
+                elif event.key == pygame.K_i and self.game_state == PLAYING:
+                    # Toggle inventario con tecla I
+                    self.show_inventory = not self.show_inventory
                 elif self.game_state == NAME_INPUT:
                     if self.name_input.handle_input(event):
                         self.game_state = CLASS_SELECTION
@@ -1296,26 +1541,24 @@ class Game:
         if player_rect.colliderect(mother_rect) and not self.mother.show_dialogue:
             self.mother.start_dialogue(self.player.x, self.player.y)
         
-        # Verificar si está en alguna escalera o salida para activar cinemática
+        # Verificar si está tocando las escaleras para activar cinemática
         if not self.cinematic_triggered:
-            # Escalera hacia abajo (sótano) - izquierda
-            if (self.player.x >= 75 and self.player.x <= 85 and 
-                self.player.y >= 375 and self.player.y <= 385):
+            # Verificar colisión con las escaleras del sótano (área específica)
+            stairs_rect = pygame.Rect(80, 380, 40, 20)  # Área de las escaleras al sótano
+            player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+            
+            if player_rect.colliderect(stairs_rect):
                 self.trigger_cinematic()
             
+            # También activar en otras escaleras si existen
             # Escalera hacia arriba - área central
-            elif (self.player.x >= 300 and self.player.x <= 350 and 
-                  self.player.y >= 240 and self.player.y <= 260):
+            upstairs_rect = pygame.Rect(300, 250, 50, 20)
+            if player_rect.colliderect(upstairs_rect):
                 self.trigger_cinematic()
             
             # Salida derecha (puerta principal)
-            elif (self.player.x >= 750 and self.player.x <= 800 and 
-                  self.player.y >= 250 and self.player.y <= 350):
-                self.trigger_cinematic()
-            
-            # Salida superior (ventana/puerta)
-            elif (self.player.x >= 400 and self.player.x <= 500 and 
-                  self.player.y >= 0 and self.player.y <= 30):
+            exit_rect = pygame.Rect(750, 280, 30, 40)
+            if player_rect.colliderect(exit_rect):
                 self.trigger_cinematic()
         
     def draw(self):
@@ -1344,6 +1587,10 @@ class Game:
             # Mostrar flash final si está activo
             if self.final_flash:
                 self.draw_final_flash()
+            
+            # Mostrar inventario si está abierto
+            if self.show_inventory:
+                self.player.inventory.draw(self.screen, 50, 50)
             
             # Actualiza la pantalla
             pygame.display.flip()
